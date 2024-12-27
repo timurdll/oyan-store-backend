@@ -1,0 +1,147 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  password     String
+  role         String
+  firstName    String?
+  lastName     String?
+  dateOfBirth  DateTime?
+  profileImage String?
+  phoneNumber  String?
+  basket       Basket?
+  ratings      Rating[]
+  favorites    Favorite[]
+  orders       Order[]   // Обратная связь с заказами
+  bonuses   Float    @default(0.0) // Начисленные бонусы
+  holdingBonuses Float @default(0.0) // Бонусы на удержании
+}
+
+model Basket {
+  id         Int            @id @default(autoincrement())
+  user_id    Int    @unique  // Добавлен атрибут @unique
+  user       User           @relation(fields: [user_id], references: [id])
+  products   BasketProduct[]
+}
+
+model BasketProduct {
+  basket_id Int
+  product_id Int
+  quantity   Int
+  basket     Basket @relation(fields: [basket_id], references: [id])
+  product    Product @relation(fields: [product_id], references: [id])
+
+  @@id([basket_id, product_id]) // Уникальная комбинация корзины и продукта
+}
+
+model Product {
+  id                     Int                     @id @default(autoincrement())
+  name                   String                  @unique
+  price                  Float
+  rating                 Float?
+  cover_image            String
+  images                 String[]
+  typeId                 Int
+  type                   Type                    @relation(fields: [typeId], references: [id])
+  basketProducts         BasketProduct[]
+  productInfo            ProductInfo?
+  ratings                Rating[]
+  favorites              Favorite[]
+  productCharacteristics ProductCharacteristic[]
+  orderProducts          OrderProduct[]          // Обратная связь с продуктами в заказах
+}
+
+model ProductInfo {
+  id         Int      @id @default(autoincrement())
+  product_id Int    @unique  // Добавлен атрибут @unique
+  product    Product  @relation(fields: [product_id], references: [id])
+  title      String
+  description String
+}
+
+model Rating {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  product_id Int
+  user       User     @relation(fields: [user_id], references: [id])
+  product    Product  @relation(fields: [product_id], references: [id])
+  rate       Int
+  @@unique([user_id, product_id]) // Один пользователь может оставить один рейтинг на товар
+}
+
+
+model Type {
+  id              Int                     @id @default(autoincrement())
+  name            String
+  products        Product[] 
+  characteristics Characteristic[]
+}
+
+model Characteristic {
+  id              Int                     @id @default(autoincrement())
+  name            String                  @unique
+  type            Type                    @relation(fields: [typeId], references: [id])
+  typeId          Int
+  productCharacteristics ProductCharacteristic[]
+}
+
+model ProductCharacteristic {
+  id              Int                     @id @default(autoincrement())
+  description     String
+  product         Product                 @relation(fields: [productId], references: [id])
+  productId       Int
+  characteristic  Characteristic          @relation(fields: [characteristicId], references: [id])
+  characteristicId Int
+}
+model Favorite {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  product_id Int
+  user       User     @relation(fields: [user_id], references: [id])
+  product    Product  @relation(fields: [product_id], references: [id])
+
+  @@unique([user_id, product_id]) // Один пользователь может добавить каждый товар в избранное только один раз
+}
+
+model Order {
+  id          Int          @id @default(autoincrement())
+  userId      Int
+  user        User         @relation(fields: [userId], references: [id])
+  status      OrderStatus  @default(PENDING)
+  totalPrice  Float
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  products    OrderProduct[]
+  phoneNumber String       // Номер телефона для связи
+}
+
+model OrderProduct {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  productId  Int
+  quantity   Int
+  order      Order    @relation(fields: [orderId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id])
+}
+
+enum OrderStatus {
+  PENDING     // Ожидает обработки
+  CONFIRMED   // Подтвержден менеджером
+  PAID        // Оплачен
+  COMPLETED   // Завершен
+  CANCELED    // Отменен
+}

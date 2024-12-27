@@ -1,0 +1,27 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: timur
+      POSTGRES_PASSWORD: b131074
+      POSTGRES_DB: oyan_store_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: adminpassword
+    ports:
+      - '8080:80'
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:
