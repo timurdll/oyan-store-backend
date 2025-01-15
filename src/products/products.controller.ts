@@ -50,6 +50,7 @@ export class ProductsController {
       name: string;
       price: number;
       typeId: number;
+      stock: number; // Добавлено поле stock
       productInfo?: { title: string; description: string };
       characteristics?: { name: string; description: string }[];
     },
@@ -65,6 +66,7 @@ export class ProductsController {
       ...data,
       cover_image: coverImagePath,
       images: imagesPaths,
+      stock: parseInt(data.stock as any, 10), // Приведение stock к целому числу
     });
   }
 
@@ -102,6 +104,15 @@ export class ProductsController {
     return this.productsService.getProductBySlug(slug);
   }
 
+  @Put(':id/stock')
+  async updateStock(
+    @Param('id') id: string,
+    @Body() data: { stock: number },
+  ): Promise<Product> {
+    const { stock } = data;
+    return this.productsService.updateProductStock(+id, stock);
+  }
+
   @Put(':id')
   @UseInterceptors(
     FileFieldsInterceptor(
@@ -133,6 +144,7 @@ export class ProductsController {
       name?: string;
       price?: number;
       typeId?: number;
+      stock?: number; // Поле stock для обновления
       productInfo?: { title: string; description: string };
       characteristics?: { name: string; description: string }[];
     },

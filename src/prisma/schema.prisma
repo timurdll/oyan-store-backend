@@ -29,6 +29,7 @@ model User {
   orders       Order[]   // Обратная связь с заказами
   bonuses   Float    @default(0.0) // Начисленные бонусы
   holdingBonuses Float @default(0.0) // Бонусы на удержании
+  notifications Notification[]  // Add this field
 }
 
 model Basket {
@@ -62,7 +63,8 @@ model Product {
   ratings                Rating[]
   favorites              Favorite[]
   productCharacteristics ProductCharacteristic[]
-  orderProducts          OrderProduct[]          // Обратная связь с продуктами в заказах
+  orderProducts          OrderProduct[]
+  stock                  Int                     @default(0) // Количество товара на складе
 }
 
 model ProductInfo {
@@ -127,6 +129,7 @@ model Order {
   updatedAt   DateTime     @updatedAt
   products    OrderProduct[]
   phoneNumber String       // Номер телефона для связи
+  legalEntityInfo String?
 }
 
 model OrderProduct {
@@ -144,4 +147,13 @@ enum OrderStatus {
   PAID        // Оплачен
   COMPLETED   // Завершен
   CANCELED    // Отменен
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  message   String
+  read      Boolean   @default(false)
+  createdAt DateTime  @default(now())
 }

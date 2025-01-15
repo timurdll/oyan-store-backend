@@ -17,6 +17,7 @@ export class ProductsService {
       title: string;
       description: string;
     };
+    stock: number; // Новое поле
     characteristics?: { name: string; description: string }[];
   }): Promise<Product> {
     const { productInfo, characteristics, ...productData } = data;
@@ -28,6 +29,7 @@ export class ProductsService {
           ...productData,
           price: parseFloat(data.price as string),
           typeId: parseInt(data.typeId as string, 10),
+          stock: data.stock, // Установить начальное количество
           productInfo: productInfo ? { create: productInfo } : undefined,
         },
       });
@@ -212,6 +214,12 @@ export class ProductsService {
       });
     });
   }
+  async updateProductStock(productId: number, stock: number): Promise<Product> {
+    return this.prisma.product.update({
+      where: { id: productId },
+      data: { stock },
+    });
+  }
 
   async addCharacteristics(
     productId: number,
@@ -249,6 +257,16 @@ export class ProductsService {
         },
       });
     }
+  }
+  async updateStock(productId: number, newStock: number): Promise<Product> {
+    if (newStock < 0) {
+      throw new Error('Stock cannot be negative');
+    }
+
+    return this.prisma.product.update({
+      where: { id: productId },
+      data: { stock: newStock },
+    });
   }
 
   async getProductBySlug(slug: string): Promise<Product | null> {
