@@ -8,9 +8,16 @@ import {
 import { Server, Socket } from 'socket.io';
 
 const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+const socketPath = process.env.SOCKET_PATH;
 
 @WebSocketGateway({
-  cors: { origin: corsOrigins, credentials: true },
+  cors: {
+    origin: corsOrigins,
+    credentials: true,
+    allowedHeaders: ['authorization'],
+  },
+  path: process.env.SOCKET_PATH || '/socket.io/',
+  transports: ['websocket'],
 })
 export class NotificationsGateway
   implements OnGatewayConnection, OnGatewayDisconnect
