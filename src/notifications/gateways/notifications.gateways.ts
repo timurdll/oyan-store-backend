@@ -15,7 +15,7 @@ import { Server, Socket } from 'socket.io';
     origin: '*',
   },
   path: '/socket.io/',
-  transports: ['websocket'],
+  transports: ['websocket', 'polling'],
 })
 export class NotificationsGateway
   implements OnGatewayConnection, OnGatewayDisconnect

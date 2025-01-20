@@ -6,15 +6,15 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
-const socketPath = process.env.SOCKET_PATH;
+// const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+// const socketPath = process.env.SOCKET_PATH;
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
   path: '/socket.io/',
-  transports: ['websocket'],
+  transports: ['websocket', 'polling'],
 })
 export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
