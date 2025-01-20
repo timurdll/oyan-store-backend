@@ -11,11 +11,9 @@ const socketPath = process.env.SOCKET_PATH;
 
 @WebSocketGateway({
   cors: {
-    origin: corsOrigins,
-    credentials: true,
-    allowedHeaders: ['authorization'],
+    origin: '*',
   },
-  path: process.env.SOCKET_PATH || '/socket.io/',
+  path: '/socket.io/',
   transports: ['websocket'],
 })
 export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
