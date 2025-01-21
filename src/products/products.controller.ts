@@ -120,7 +120,11 @@ export class ProductsController {
         { name: 'cover_image', maxCount: 1 },
         { name: 'images', maxCount: 5 },
       ],
+
       {
+        limits: {
+          fileSize: 10 * 1024 * 1024, // 10 MB
+        },
         storage: diskStorage({
           destination: './uploads/products',
           filename: (req, file, cb) => {
