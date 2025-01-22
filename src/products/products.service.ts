@@ -105,7 +105,13 @@ export class ProductsService {
       characteristics?: { name: string; description: string }[];
     },
   ): Promise<Product> {
-    const { productInfo, characteristics, ...productData } = data;
+    const {
+      productInfo,
+      characteristics,
+      cover_image,
+      images,
+      ...productData
+    } = data;
 
     return this.prisma.$transaction(async (prisma) => {
       // Step 1: Update the product
@@ -113,6 +119,8 @@ export class ProductsService {
         where: { id },
         data: {
           ...productData,
+          cover_image: cover_image || undefined, // Обновление обложки
+          images: images && images.length > 0 ? images : undefined, // Обновление изображений
           price: data.price ? parseFloat(data.price as any) : undefined,
           typeId: data.typeId ? parseInt(data.typeId as any, 10) : undefined,
         },
@@ -132,7 +140,7 @@ export class ProductsService {
 
       // Step 3: Handle characteristics
       if (characteristics && characteristics.length > 0) {
-        // Delete existing characteristics for the product
+        // Delete existing characteristics
         await prisma.productCharacteristic.deleteMany({
           where: { productId: id },
         });
@@ -141,6 +149,7 @@ export class ProductsService {
         for (const char of characteristics) {
           if (!char.name || !char.description) continue;
 
+          // Find or create characteristic
           const existingChar = await prisma.characteristic.findUnique({
             where: { name: char.name },
           });
@@ -148,10 +157,7 @@ export class ProductsService {
           const characteristic =
             existingChar ||
             (await prisma.characteristic.create({
-              data: {
-                name: char.name,
-                typeId: product.typeId,
-              },
+              data: { name: char.name, typeId: data.typeId || product.typeId },
             }));
 
           await prisma.productCharacteristic.create({

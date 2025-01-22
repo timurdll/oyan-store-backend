@@ -120,7 +120,6 @@ export class ProductsController {
         { name: 'cover_image', maxCount: 1 },
         { name: 'images', maxCount: 5 },
       ],
-
       {
         limits: {
           fileSize: 10 * 1024 * 1024, // 10 MB
@@ -154,10 +153,11 @@ export class ProductsController {
     },
   ): Promise<Product> {
     const coverImagePath = files.cover_image
-      ? `/uploads/${files.cover_image[0].filename}`
+      ? `/uploads/products/${files.cover_image[0].filename}`
       : undefined;
+
     const imagesPaths = files.images
-      ? files.images.map((file) => `/uploads/${file.filename}`)
+      ? files.images.map((file) => `/uploads/products/${file.filename}`)
       : undefined;
 
     return this.productsService.updateProduct(+id, {
