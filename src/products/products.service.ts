@@ -2,10 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Product } from '@prisma/client';
 import slugify from 'slugify';
+import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async createProduct(data: {
     name: string;
@@ -269,10 +273,17 @@ export class ProductsService {
       throw new Error('Stock cannot be negative');
     }
 
-    return this.prisma.product.update({
+    const product = await this.prisma.product.update({
       where: { id: productId },
       data: { stock: newStock },
     });
+
+    // Если количество товара увеличилось, уведомить пользователей
+    if (newStock > 0) {
+      await this.notifyPreOrderUsers(productId);
+    }
+
+    return product;
   }
 
   async getProductBySlug(slug: string): Promise<Product | null> {
@@ -293,5 +304,37 @@ export class ProductsService {
         (product) => slugify(product.name, { lower: true }) === slug,
       ) || null
     );
+  }
+  async createPreOrder(userId: number, productId: number) {
+    // Create pre-order
+    const preOrder = await this.prisma.preOrder.create({
+      data: { userId, productId },
+    });
+
+    return preOrder;
+  }
+
+  async notifyPreOrderUsers(productId: number) {
+    // Find all pre-orders for this product
+    const preOrders = await this.prisma.preOrder.findMany({
+      where: { productId },
+      include: {
+        user: true,
+        product: true, // Add this to include product details
+      },
+    });
+
+    // Send notifications and delete pre-orders
+    for (const preOrder of preOrders) {
+      await this.notificationsService.createNotification(
+        preOrder.userId,
+        `Товар "${preOrder.product.name}" теперь доступен!`,
+      );
+
+      // Optional: Delete pre-order after notification
+      await this.prisma.preOrder.delete({
+        where: { id: preOrder.id },
+      });
+    }
   }
 }

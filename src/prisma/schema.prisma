@@ -30,6 +30,7 @@ model User {
   bonuses   Float    @default(0.0) // Начисленные бонусы
   holdingBonuses Float @default(0.0) // Бонусы на удержании
   notifications Notification[]  // Add this field
+  preOrders    PreOrder[]
 }
 
 model Basket {
@@ -45,7 +46,6 @@ model BasketProduct {
   quantity   Int
   basket     Basket @relation(fields: [basket_id], references: [id])
   product    Product @relation(fields: [product_id], references: [id])
-
   @@id([basket_id, product_id]) // Уникальная комбинация корзины и продукта
 }
 
@@ -65,6 +65,7 @@ model Product {
   productCharacteristics ProductCharacteristic[]
   orderProducts          OrderProduct[]
   stock                  Int                     @default(0) // Количество товара на складе
+  preOrders              PreOrder[]
 }
 
 model ProductInfo {
@@ -156,4 +157,13 @@ model Notification {
   message   String
   read      Boolean   @default(false)
   createdAt DateTime  @default(now())
+}
+
+model PreOrder {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  productId  Int
+  user       User     @relation(fields: [userId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id])
+  createdAt  DateTime @default(now())
 }

@@ -9,11 +9,12 @@ import {
   UseGuards,
   UploadedFiles,
   UseInterceptors,
+  Request,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { ProductsService } from './products.service';
-import { Product } from '@prisma/client';
+import { PreOrder, Product } from '@prisma/client';
 import { RolesGuard } from 'src/guards/roles.guard';
 import { AuthGuard } from 'src/guards/jwt-auth.guard';
 import { extname } from 'path';
@@ -110,9 +111,17 @@ export class ProductsController {
     @Body() data: { stock: number },
   ): Promise<Product> {
     const { stock } = data;
-    return this.productsService.updateProductStock(+id, stock);
+    return this.productsService.updateStock(+id, stock);
   }
-
+  @Post(':id/pre-order')
+  @UseGuards(AuthGuard)
+  async createPreOrder(
+    @Param('id') productId: string,
+    @Request() req,
+  ): Promise<PreOrder> {
+    const userId = req.user['userId']; // Получаем userId из токена
+    return this.productsService.createPreOrder(userId, +productId);
+  }
   @Put(':id')
   @UseInterceptors(
     FileFieldsInterceptor(
@@ -147,7 +156,7 @@ export class ProductsController {
       name?: string;
       price?: number;
       typeId?: number;
-      stock?: number; // Поле stock для обновления
+      stock?: number;
       productInfo?: { title: string; description: string };
       characteristics?: { name: string; description: string }[];
     },
