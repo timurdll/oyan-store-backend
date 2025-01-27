@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Product } from '@prisma/client';
 import slugify from 'slugify';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import * as twilio from 'twilio';
 
 @Injectable()
 export class ProductsService {
@@ -10,6 +11,13 @@ export class ProductsService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  private twilioClient = twilio(
+    process.env.TWILIO_SID, // SID из переменных окружения
+    process.env.TWILIO_AUTH_TOKEN, // Auth Token из переменных окружения
+  );
+
+  private companyWhatsAppNumber = process.env.COMPANY_WHATSAPP_NUMBER;
 
   async createProduct(data: {
     name: string;
@@ -82,19 +90,22 @@ export class ProductsService {
       },
     });
   }
-
-  async getProductById(id: number): Promise<Product | null> {
-    return this.prisma.product.findUnique({
-      where: { id },
-      include: {
-        productInfo: true,
-        ratings: true,
-        productCharacteristics: {
-          include: { characteristic: true },
-        },
-      },
-    });
-  }
+  // async getProductById(id: number): Promise<Product | null> {
+  //   return this.prisma.product.findUnique({
+  //     where: {
+  //       id, // Ensure `id` is correctly passed
+  //     },
+  //     include: {
+  //       productInfo: true,
+  //       ratings: true,
+  //       productCharacteristics: {
+  //         include: {
+  //           characteristic: true,
+  //         },
+  //       },
+  //     },
+  //   });
+  // }
 
   // В ProductsService
   async updateProduct(
@@ -286,6 +297,19 @@ export class ProductsService {
     return product;
   }
 
+  private async sendWhatsAppMessage(message: string) {
+    try {
+      await this.twilioClient.messages.create({
+        from: 'whatsapp:+14155238886', // Ваш Twilio номер WhatsApp
+        to: this.companyWhatsAppNumber, // Номер компании, на который отправляется сообщение
+        body: message,
+      });
+      console.log('Сообщение отправлено на WhatsApp');
+    } catch (error) {
+      console.error('Ошибка при отправке сообщения:', error);
+    }
+  }
+
   async getProductBySlug(slug: string): Promise<Product | null> {
     // Преобразуем `slug` обратно в имя для поиска в базе данных
     const allProducts = await this.prisma.product.findMany({
@@ -305,11 +329,25 @@ export class ProductsService {
       ) || null
     );
   }
-  async createPreOrder(userId: number, productId: number) {
-    // Create pre-order
+  async createPreOrder(userId: number, productId: number, phoneNumber: string) {
+    // Найти товар по ID, чтобы получить его название
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { name: true }, // Запрашиваем только поле name
+    });
+
+    if (!product) {
+      throw new Error(`Товар с ID ${productId} не найден`);
+    }
+
+    // Создать предзаказ
     const preOrder = await this.prisma.preOrder.create({
       data: { userId, productId },
     });
+
+    // Отправить сообщение через WhatsApp
+    const message = `Клиент с номером ${phoneNumber} сделал предзаказ на товар "${product.name}"`;
+    await this.sendWhatsAppMessage(message);
 
     return preOrder;
   }
@@ -336,5 +374,30 @@ export class ProductsService {
         where: { id: preOrder.id },
       });
     }
+  }
+
+  // In ProductsService
+  async getUserPreOrders(userId: number) {
+    if (!userId) {
+      throw new BadRequestException('User ID is required');
+    }
+
+    return this.prisma.preOrder.findMany({
+      where: {
+        userId: userId,
+      },
+      include: {
+        product: {
+          include: {
+            productInfo: true,
+            productCharacteristics: {
+              include: {
+                characteristic: true,
+              },
+            },
+          },
+        },
+      },
+    });
   }
 }

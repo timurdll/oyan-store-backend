@@ -24,14 +24,7 @@ export class OrdersService {
   // 3 процента
 
   async createOrder(userId: number, orderData: any) {
-    const {
-      product,
-      phoneNumber,
-      address,
-      paymentData,
-      totalAmount,
-      legalEntityInfo,
-    } = orderData;
+    const { product, phoneNumber, totalAmount, legalEntityInfo } = orderData;
 
     if (!Array.isArray(product) || product.length === 0) {
       throw new Error('Product list is empty or undefined');

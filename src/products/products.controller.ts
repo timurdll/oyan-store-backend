@@ -10,6 +10,7 @@ import {
   UploadedFiles,
   UseInterceptors,
   Request,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -76,14 +77,25 @@ export class ProductsController {
     return this.productsService.getAllProducts();
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<Product | null> {
-    return this.productsService.getProductById(+id);
-  }
+  // @Get(':id')
+  // async findOne(@Param('id') id: string): Promise<Product | null> {
+  //   return this.productsService.getProductById(+id);
+  // }
 
   @Delete(':id')
   async remove(@Param('id') id: string): Promise<Product> {
     return this.productsService.deleteProduct(+id);
+  }
+
+  // In ProductsController
+  @Get('pre-orders') // Changed from '/pre-order' to 'pre-orders'
+  @UseGuards(AuthGuard)
+  async getUserPreOrders(@Request() req): Promise<PreOrder[]> {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('User ID not found in token');
+    }
+    return this.productsService.getUserPreOrders(userId);
   }
 
   // Добавление характеристик к продукту
@@ -118,9 +130,14 @@ export class ProductsController {
   async createPreOrder(
     @Param('id') productId: string,
     @Request() req,
+    @Body() body: { phoneNumber: string }, // Change type to an object with phoneNumber
   ): Promise<PreOrder> {
-    const userId = req.user['userId']; // Получаем userId из токена
-    return this.productsService.createPreOrder(userId, +productId);
+    const userId = req.user['userId'];
+    return this.productsService.createPreOrder(
+      userId,
+      +productId,
+      body.phoneNumber,
+    ); // Extract phoneNumber from body
   }
   @Put(':id')
   @UseInterceptors(
