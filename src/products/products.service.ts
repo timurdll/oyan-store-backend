@@ -106,6 +106,18 @@ export class ProductsService {
   //     },
   //   });
   // }
+  async getProductById(id: number): Promise<Product | null> {
+    return this.prisma.product.findUnique({
+      where: { id },
+      include: {
+        productInfo: true,
+        ratings: true,
+        productCharacteristics: {
+          include: { characteristic: true },
+        },
+      },
+    });
+  }
 
   // В ProductsService
   async updateProduct(

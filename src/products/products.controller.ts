@@ -77,10 +77,10 @@ export class ProductsController {
     return this.productsService.getAllProducts();
   }
 
-  // @Get(':id')
-  // async findOne(@Param('id') id: string): Promise<Product | null> {
-  //   return this.productsService.getProductById(+id);
-  // }
+  @Get(':id')
+  async findOne(@Param('id') id: string): Promise<Product | null> {
+    return this.productsService.getProductById(+id);
+  }
 
   @Delete(':id')
   async remove(@Param('id') id: string): Promise<Product> {
