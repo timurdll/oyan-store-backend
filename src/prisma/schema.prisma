@@ -64,9 +64,15 @@ model Product {
   favorites              Favorite[]
   productCharacteristics ProductCharacteristic[]
   orderProducts          OrderProduct[]
-  stock                  Int                     @default(0) // Количество товара на складе
+  stock                  Int                     @default(0)
   preOrders              PreOrder[]
+  
+  // Новые поля для ссылок на маркетплейсы
+  halyqLink              String?
+  kaspiLink              String?
+  satuLink               String?
 }
+
 
 model ProductInfo {
   id         Int      @id @default(autoincrement())

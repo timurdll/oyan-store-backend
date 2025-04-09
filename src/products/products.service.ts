@@ -29,29 +29,42 @@ export class ProductsService {
       title: string;
       description: string;
     };
-    stock: number; // Новое поле
+    stock: number;
     characteristics?: { name: string; description: string }[];
+    // Новые поля для маркетплейс ссылок
+    halyqLink?: string;
+    kaspiLink?: string;
+    satuLink?: string;
   }): Promise<Product> {
-    const { productInfo, characteristics, ...productData } = data;
+    const {
+      productInfo,
+      characteristics,
+      halyqLink,
+      kaspiLink,
+      satuLink,
+      ...productData
+    } = data;
 
     return this.prisma.$transaction(async (prisma) => {
-      // Step 1: Create the product
+      // Шаг 1: Создание товара с добавлением ссылок на маркетплейсы
       const product = await prisma.product.create({
         data: {
           ...productData,
           price: parseFloat(data.price as string),
           typeId: parseInt(data.typeId as string, 10),
-          stock: data.stock, // Установить начальное количество
+          stock: data.stock,
+          halyqLink, // Ссылка на маркетплейс "Халык"
+          kaspiLink, // Ссылка на маркетплейс "Каспи"
+          satuLink, // Ссылка на маркетплейс "Сату"
           productInfo: productInfo ? { create: productInfo } : undefined,
         },
       });
 
-      // Step 2: Handle characteristics
+      // Шаг 2: Обработка характеристик
       if (characteristics && characteristics.length > 0) {
         for (const char of characteristics) {
-          if (!char.name || !char.description) continue; // Skip invalid entries
+          if (!char.name || !char.description) continue;
 
-          // Find or create characteristic
           const existingChar = await prisma.characteristic.findUnique({
             where: { name: char.name },
           });
@@ -65,7 +78,6 @@ export class ProductsService {
               },
             }));
 
-          // Link characteristic to product
           await prisma.productCharacteristic.create({
             data: {
               productId: product.id,
@@ -130,6 +142,10 @@ export class ProductsService {
       typeId?: number;
       productInfo?: { title: string; description: string };
       characteristics?: { name: string; description: string }[];
+      // Новые поля для маркетплейс ссылок
+      halyqLink?: string;
+      kaspiLink?: string;
+      satuLink?: string;
     },
   ): Promise<Product> {
     const {
@@ -137,23 +153,29 @@ export class ProductsService {
       characteristics,
       cover_image,
       images,
+      halyqLink,
+      kaspiLink,
+      satuLink,
       ...productData
     } = data;
 
     return this.prisma.$transaction(async (prisma) => {
-      // Step 1: Update the product
+      // Шаг 1: Обновление товара с учетом новых полей
       const product = await prisma.product.update({
         where: { id },
         data: {
           ...productData,
-          cover_image: cover_image || undefined, // Обновление обложки
-          images: images && images.length > 0 ? images : undefined, // Обновление изображений
+          cover_image: cover_image || undefined,
+          images: images && images.length > 0 ? images : undefined,
           price: data.price ? parseFloat(data.price as any) : undefined,
           typeId: data.typeId ? parseInt(data.typeId as any, 10) : undefined,
+          halyqLink, // Обновляем ссылку "Халык"
+          kaspiLink, // Обновляем ссылку "Каспи"
+          satuLink, // Обновляем ссылку "Сату"
         },
       });
 
-      // Step 2: Update or create `productInfo`
+      // Шаг 2: Обновление или создание productInfo
       if (productInfo) {
         await prisma.productInfo.upsert({
           where: { product_id: id },
@@ -165,18 +187,15 @@ export class ProductsService {
         });
       }
 
-      // Step 3: Handle characteristics
+      // Шаг 3: Обработка характеристик
       if (characteristics && characteristics.length > 0) {
-        // Delete existing characteristics
         await prisma.productCharacteristic.deleteMany({
           where: { productId: id },
         });
 
-        // Add new characteristics
         for (const char of characteristics) {
           if (!char.name || !char.description) continue;
 
-          // Find or create characteristic
           const existingChar = await prisma.characteristic.findUnique({
             where: { name: char.name },
           });

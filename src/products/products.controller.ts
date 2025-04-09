@@ -52,9 +52,13 @@ export class ProductsController {
       name: string;
       price: number;
       typeId: number;
-      stock: number; // Добавлено поле stock
+      stock: number;
       productInfo?: { title: string; description: string };
       characteristics?: { name: string; description: string }[];
+      // Новые поля для маркетплейс ссылок
+      halyqLink?: string;
+      kaspiLink?: string;
+      satuLink?: string;
     },
   ): Promise<Product> {
     const coverImagePath = files.cover_image
@@ -68,7 +72,7 @@ export class ProductsController {
       ...data,
       cover_image: coverImagePath,
       images: imagesPaths,
-      stock: parseInt(data.stock as any, 10), // Приведение stock к целому числу
+      stock: parseInt(data.stock as any, 10),
     });
   }
 

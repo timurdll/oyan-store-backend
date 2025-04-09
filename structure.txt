@@ -1,0 +1,161 @@
+.
+├── docker-compose.yml
+├── nest-cli.json
+├── package.json
+├── package-lock.json
+├── README.md
+├── src
+│   ├── app.module.ts
+│   ├── basket
+│   │   ├── basket.controller.ts
+│   │   ├── basket.module.ts
+│   │   └── basket.service.ts
+│   ├── configurations
+│   │   └── index.ts
+│   ├── cors-config.ts
+│   ├── favorites
+│   │   ├── favorites.controller.ts
+│   │   ├── favorites.module.ts
+│   │   └── favorites.service.ts
+│   ├── guards
+│   │   ├── jwt-auth.guard.ts
+│   │   └── roles.guard.ts
+│   ├── main.ts
+│   ├── middleware
+│   │   └── auth.middleware.ts
+│   ├── notifications
+│   │   ├── gateways
+│   │   │   └── notifications.gateways.ts
+│   │   ├── notifications.controller.ts
+│   │   ├── notifications.module.ts
+│   │   └── notifications.service.ts
+│   ├── orders
+│   │   ├── dto
+│   │   │   └── create-order.dto.ts
+│   │   ├── gateways
+│   │   │   └── orders.gateways.ts
+│   │   ├── orders.controller.ts
+│   │   ├── orders.module.ts
+│   │   └── orders.service.ts
+│   ├── prisma
+│   │   ├── migrations
+│   │   │   ├── 20241104101551_init
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241105091211_add_favorites
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241111092720_characteristics_added
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241111103926_
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241112094452_product_characteristic
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241113130849_product_update
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241115123821_basket_update
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241116082408_basket_quantity_fix
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241128083237_add_profile_iamge
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241204095754_add_phone_number
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241204115517_order_addition
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20241211082008_bonus_system
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20250109065113_stock_added
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20250113082245_notifications_added
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20250115101511_legal_entity_info
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20250123073300_preorders_added
+│   │   │   │   └── migration.sql
+│   │   │   └── migration_lock.toml
+│   │   ├── prisma.module.ts
+│   │   ├── prisma.service.ts
+│   │   └── schema.prisma
+│   ├── products
+│   │   ├── products.controller.ts
+│   │   ├── products.module.ts
+│   │   ├── products.service.ts
+│   │   └── types
+│   │       ├── types.controller.ts
+│   │       ├── types.module.ts
+│   │       └── types.service.ts
+│   ├── types
+│   │   └── express.d.ts
+│   └── users
+│       ├── jwt.startegy.ts
+│       ├── users.controller.ts
+│       ├── users.module.ts
+│       └── users.service.ts
+├── structure.txt
+├── test
+│   ├── app.e2e-spec.ts
+│   └── jest-e2e.json
+├── tsconfig.build.json
+├── tsconfig.json
+└── uploads
+    ├── avatars
+    │   └── 1735312107555-953154565.jpg
+    └── products
+        ├── 1736406927228-852989382.jpg
+        ├── 1736406927229-134989553.jpg
+        ├── 1736406927229-90391867.jpg
+        ├── 1736406927230-136730443.jpg
+        ├── 1736406927235-235602740.jpg
+        ├── 1736406927236-946190825.jpg
+        ├── 1736409681394-757140048.jpg
+        ├── 1736409681491-504757368.jpg
+        ├── 1736409681590-429835580.jpg
+        ├── 1736409682078-377214379.jpg
+        ├── 1736409683047-255968846.jpg
+        ├── 1736409683536-696904847.jpg
+        ├── 1736409752676-318964319.jpg
+        ├── 1736409752773-792092104.jpg
+        ├── 1736409752871-962283662.jpg
+        ├── 1736409753360-369141386.jpg
+        ├── 1736409754329-834877192.jpg
+        ├── 1736409754817-880149533.jpg
+        ├── 1736409817629-187912347.jpg
+        ├── 1736409817727-596595560.jpg
+        ├── 1736409817824-773850850.jpg
+        ├── 1736409818314-225513268.jpg
+        ├── 1736409819283-614994095.jpg
+        ├── 1736409819771-825486716.jpg
+        ├── 1736409918944-434215323.jpg
+        ├── 1736409919041-664115559.jpg
+        ├── 1736410114450-897925344.jpg
+        ├── 1736410114541-381640282.jpg
+        ├── 1736410141215-321067671.jpg
+        ├── 1736410141312-439808758.jpg
+        ├── 1736430522265-573447481.jpg
+        ├── 1736430523238-801220928.jpg
+        ├── 1736430524304-515976412.jpg
+        ├── 1736430525568-943524804.jpg
+        ├── 1736430902960-735699986.jpg
+        ├── 1736430903644-873534032.jpg
+        ├── 1736430904418-865750998.jpg
+        ├── 1736430905102-525471391.jpg
+        ├── 1736430905680-951080997.jpg
+        ├── 1736430906649-685311777.jpg
+        ├── 1736430906844-978993017.jpg
+        ├── 1736430907627-626595015.jpg
+        ├── 1737023113160-610358279.png
+        ├── 1737444785669-853324896.jpg
+        ├── 1737444785670-910922313.jpg
+        ├── 1737444785673-411780519.jpg
+        ├── 1737444785676-562748321.jpg
+        ├── 1737444785680-919034728.jpg
+        ├── 1737444815514-158586426.jpg
+        ├── 1737444815514-595290051.jpg
+        ├── 1737444815520-241853064.jpg
+        ├── 1737444815527-764513831.jpg
+        ├── 1737444815531-600213695.jpg
+        ├── 1737545771324-307165755.png
+        ├── 1737967708265-476052776.png
+        ├── 1737967708272-246154715.png
+        └── 1737967708278-871973467.png
+
+38 directories, 121 files
