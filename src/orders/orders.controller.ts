@@ -49,6 +49,20 @@ export class OrderController {
     return this.orderService.createOrder(userId, orderData);
   }
 
+  @Post('quick-purchase')
+  // Если требуется авторизация, добавьте @UseGuards(AuthGuard)
+  async quickPurchase(
+    @Body()
+    quickPurchaseData: {
+      fullName: string;
+      phoneNumber: string;
+      productId: number;
+    },
+  ) {
+    const { fullName, phoneNumber, productId } = quickPurchaseData;
+    return this.orderService.quickPurchase(fullName, phoneNumber, productId);
+  }
+
   @Get()
   @UseGuards(AuthGuard) // Защищаем маршрут
   async getUserOrders(@Req() req: Request) {
@@ -68,6 +82,6 @@ export class OrderController {
     @Param('id') orderId: string, // Initially a string
     @Body('status') status: OrderStatus,
   ) {
-    return this.orderService.updateOrderStatus(Number(orderId), status); // Convert to number
+    return this.orderService.updateOrderStatus(Number(orderId), status);
   }
 }

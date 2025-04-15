@@ -190,6 +190,26 @@ export class OrdersService {
     });
   }
 
+  async quickPurchase(
+    fullName: string,
+    phoneNumber: string,
+    productId: number,
+  ) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Товар не найден');
+    }
+
+    const message = `Запрос на быструю покупку:\nПользователь: ${fullName}\nТелефон: ${phoneNumber}\nТовар: ${product.name}`;
+
+    await this.sendWhatsAppMessage(message);
+
+    return { success: true, message: 'Запрос на быструю покупку отправлен' };
+  }
+
   // Получение одного заказа
   async getOrderById(orderId: number) {
     return this.prisma.order.findUnique({
