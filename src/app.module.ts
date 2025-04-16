@@ -13,6 +13,7 @@ import { TypesModule } from './products/types/types.module';
 import { BasketModule } from './basket/basket.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { OrdersModule } from './orders/orders.module';
+import { SitemapModule } from './sitemap/sitemap.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { OrdersModule } from './orders/orders.module';
     }),
     FavoritesModule,
     OrdersModule,
+    SitemapModule,
   ],
 })
 export class AppModule {}
