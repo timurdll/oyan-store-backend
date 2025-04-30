@@ -7,8 +7,9 @@ import {
   Put,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
-import { Type } from '@prisma/client';
+import { Language, Type } from '@prisma/client';
 import { RolesGuard } from 'src/guards/roles.guard';
 import { TypesService } from './types.service';
 import { AuthGuard } from 'src/guards/jwt-auth.guard';
@@ -24,13 +25,19 @@ export class TypesController {
   }
 
   @Get()
-  async findAll(): Promise<Type[]> {
-    return this.typesService.getAllTypes();
+  async findAll(@Query('language') language?: Language) {
+    return this.typesService.getAllTypes(language);
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<Type | null> {
-    return this.typesService.getTypeById(+id);
+  async findOne(
+    @Param('id') id: string,
+    @Query('language') language?: Language,
+  ) {
+    if (!id || id === 'undefined' || isNaN(+id)) {
+      return null; // Return null for invalid or undefined IDs
+    }
+    return this.typesService.getTypeById(+id, language);
   }
 
   @UseGuards(AuthGuard, RolesGuard) // Только администраторы могут обновлять типы

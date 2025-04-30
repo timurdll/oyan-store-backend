@@ -11,11 +11,12 @@ import {
   UseInterceptors,
   Request,
   UnauthorizedException,
+  Query,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { ProductsService } from './products.service';
-import { PreOrder, Product } from '@prisma/client';
+import { Language, PreOrder, Product } from '@prisma/client';
 import { RolesGuard } from 'src/guards/roles.guard';
 import { AuthGuard } from 'src/guards/jwt-auth.guard';
 import { extname } from 'path';
@@ -77,13 +78,16 @@ export class ProductsController {
   }
 
   @Get()
-  async findAll(): Promise<Product[]> {
-    return this.productsService.getAllProducts();
+  async findAll(@Query('language') language?: Language): Promise<Product[]> {
+    return this.productsService.getAllProducts(language);
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<Product | null> {
-    return this.productsService.getProductById(+id);
+  async findOne(
+    @Param('id') id: string,
+    @Query('language') language?: Language,
+  ): Promise<Product | null> {
+    return this.productsService.getProductById(+id, language);
   }
 
   @Delete(':id')
@@ -117,8 +121,11 @@ export class ProductsController {
   }
 
   @Get('slug/:slug')
-  async getProductBySlug(@Param('slug') slug: string): Promise<Product | null> {
-    return this.productsService.getProductBySlug(slug);
+  async getProductBySlug(
+    @Param('slug') slug: string,
+    @Query('language') language?: Language,
+  ): Promise<Product | null> {
+    return this.productsService.getProductBySlug(slug, language);
   }
 
   @Put(':id/stock')

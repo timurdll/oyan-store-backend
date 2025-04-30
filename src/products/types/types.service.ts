@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Type } from '@prisma/client'; // Импортируйте тип Prisma
+import { Language, Type } from '@prisma/client'; // Обновленный импорт
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
@@ -14,15 +14,74 @@ export class TypesService {
   }
 
   // Метод для получения всех типов
-  async getAllTypes(): Promise<Type[]> {
-    return this.prisma.type.findMany();
+  async getAllTypes(language?: Language): Promise<any[]> {
+    const types = await this.prisma.type.findMany({
+      include: {
+        translations: language
+          ? {
+              where: { language },
+            }
+          : true,
+        characteristics: {
+          include: {
+            productCharacteristics: true,
+          },
+        },
+      },
+    });
+
+    // Если указан язык, применяем переводы к результатам
+    if (language) {
+      return types.map((type) => {
+        const translation = type.translations.find(
+          (t) => t.language === language,
+        );
+        return {
+          ...type,
+          name: translation?.name || type.name, // Используем перевод, если он есть
+          originalName: type.name, // Сохраняем оригинальное имя
+          translation: translation || null,
+        };
+      });
+    }
+
+    return types;
   }
 
   // Метод для получения типа по ID
-  async getTypeById(id: number): Promise<Type | null> {
-    return this.prisma.type.findUnique({
+  async getTypeById(id: number, language?: Language): Promise<any> {
+    const type = await this.prisma.type.findUnique({
       where: { id },
+      include: {
+        translations: language
+          ? {
+              where: { language },
+            }
+          : true,
+        characteristics: {
+          include: {
+            productCharacteristics: true,
+          },
+        },
+      },
     });
+
+    if (!type) return null;
+
+    // Если указан язык, применяем перевод
+    if (language) {
+      const translation = type.translations.find(
+        (t) => t.language === language,
+      );
+      return {
+        ...type,
+        name: translation?.name || type.name,
+        originalName: type.name,
+        translation: translation || null,
+      };
+    }
+
+    return type;
   }
 
   // Метод для обновления типа

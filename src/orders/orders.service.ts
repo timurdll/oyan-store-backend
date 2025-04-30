@@ -1,9 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaClient, OrderStatus } from '@prisma/client';
+import {
+  PrismaClient,
+  OrderStatus,
+  Language,
+  Order,
+  Product,
+  ProductTranslation,
+} from '@prisma/client';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import * as twilio from 'twilio';
 import { OrdersGateway } from './gateways/orders.gateways';
+import { CreateOrderDto, OrderWithTranslations } from './dto/create-order.dto';
 
 @Injectable()
 export class OrdersService {
@@ -15,15 +23,13 @@ export class OrdersService {
   private prisma = new PrismaClient();
 
   private twilioClient = twilio(
-    process.env.TWILIO_SID, // SID из переменных окружения
-    process.env.TWILIO_AUTH_TOKEN, // Auth Token из переменных окружения
+    process.env.TWILIO_SID,
+    process.env.TWILIO_AUTH_TOKEN,
   );
 
   private companyWhatsAppNumber = process.env.COMPANY_WHATSAPP_NUMBER;
 
-  // 3 процента
-
-  async createOrder(userId: number, orderData: any) {
+  async createOrder(userId: number, orderData: CreateOrderDto): Promise<Order> {
     const { product, phoneNumber, totalAmount, legalEntityInfo } = orderData;
 
     if (!Array.isArray(product) || product.length === 0) {
@@ -58,7 +64,6 @@ export class OrdersService {
               quantity: item.quantity,
             })),
           },
-          // Add legal entity info if provided
           ...(legalEntityInfo && {
             legalEntityInfo: JSON.stringify(legalEntityInfo),
           }),
@@ -89,112 +94,90 @@ export class OrdersService {
       order.products,
       totalAmount,
     );
-
     await this.sendWhatsAppMessage(message);
 
     return order;
   }
 
-  private createWhatsAppMessage(
-    orderData: {
-      phoneNumber: string;
-      fullName: string;
-      email: string;
-      address: any;
-      paymentData: any;
-      legalEntityInfo?: {
-        companyName: string;
-        bin: string;
-        companyAddress: string;
-        companyPhone: string;
-        postalCode: string;
-        iik: string;
-        bik: string;
-        bankName: string;
-      };
-    },
-    products: {
-      productId: number;
-      quantity: number;
-      product: { name: string };
-    }[],
-    totalAmount: number,
-  ): string {
-    let message = `Новый заказ!\n\n`;
-
-    // Добавляем информацию о юридическом лице, если она есть
-    if (orderData.legalEntityInfo) {
-      message += `=== ЮРИДИЧЕСКОЕ ЛИЦО ===\n`;
-      message += `Компания: ${orderData.legalEntityInfo.companyName}\n`;
-      message += `БИН: ${orderData.legalEntityInfo.bin}\n`;
-      message += `Юр. адрес: ${orderData.legalEntityInfo.companyAddress}\n`;
-      message += `Почтовый индекс: ${orderData.legalEntityInfo.postalCode}\n`;
-      message += `Телефон компании: ${orderData.legalEntityInfo.companyPhone}\n`;
-      message += `ИИК: ${orderData.legalEntityInfo.iik}\n`;
-      message += `БИК: ${orderData.legalEntityInfo.bik}\n`;
-      message += `Банк: ${orderData.legalEntityInfo.bankName}\n\n`;
-    }
-
-    // Информация о контактном лице
-    message += `=== КОНТАКТНАЯ ИНФОРМАЦИЯ ===\n`;
-    message += `Имя: ${orderData.fullName}\n`;
-    message += `Телефон: ${orderData.phoneNumber}\n`;
-    message += `Email: ${orderData.email}\n\n`;
-
-    // Адрес доставки
-    message += `=== АДРЕС ДОСТАВКИ ===\n`;
-    message += `Город: ${orderData.address.city}\n`;
-    message += `Улица: ${orderData.address.street}\n`;
-    message += `Дом: ${orderData.address.houseNumber}\n`;
-    message += `Подъезд: ${orderData.address.entrance || 'Не указан'}\n`;
-    message += `Квартира: ${orderData.address.apartment || 'Не указана'}\n\n`;
-
-    // Информация об оплате и заказе
-    message += `=== ИНФОРМАЦИЯ О ЗАКАЗЕ ===\n`;
-    message += `Способ оплаты: ${orderData.paymentData.paymentMethod.join(', ')}\n`;
-    message += `Общая стоимость: ${totalAmount}₸\n\n`;
-
-    // Список продуктов
-    message += `=== ТОВАРЫ ===\n`;
-    products.forEach((item) => {
-      message += `- ${item.product.name}, Количество: ${item.quantity}\n`;
-    });
-
-    return message;
-  }
-  // Отправка сообщения на WhatsApp
-  private async sendWhatsAppMessage(message: string) {
-    try {
-      await this.twilioClient.messages.create({
-        from: 'whatsapp:+14155238886', // Ваш Twilio номер WhatsApp
-        to: this.companyWhatsAppNumber, // Номер компании, на который отправляется сообщение
-        body: message,
-      });
-      console.log('Сообщение отправлено на WhatsApp');
-    } catch (error) {
-      console.error('Ошибка при отправке сообщения:', error);
-    }
-  }
-
-  // Получение всех заказов пользователя
-  async getUserOrders(userId: number) {
-    return this.prisma.order.findMany({
+  async getUserOrders(
+    userId: number,
+    language?: Language,
+  ): Promise<OrderWithTranslations[]> {
+    const orders = await this.prisma.order.findMany({
       where: { userId },
       include: {
         products: {
           include: {
-            product: true,
+            product: {
+              include: {
+                translations: language
+                  ? {
+                      where: { language },
+                    }
+                  : true,
+              },
+            },
           },
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
+
+    return orders.map((order) => ({
+      ...order,
+      products: order.products.map((op) => ({
+        ...op,
+        product: {
+          ...op.product,
+          name:
+            language && op.product.translations?.length > 0
+              ? op.product.translations[0].name
+              : op.product.name,
+        },
+      })),
+    }));
+  }
+
+  async getAllOrders(language?: Language): Promise<OrderWithTranslations[]> {
+    const orders = await this.prisma.order.findMany({
+      include: {
+        products: {
+          include: {
+            product: {
+              include: {
+                translations: language
+                  ? {
+                      where: { language },
+                    }
+                  : true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return orders.map((order) => ({
+      ...order,
+      products: order.products.map((op) => ({
+        ...op,
+        product: {
+          ...op.product,
+          name:
+            language && op.product.translations?.length > 0
+              ? op.product.translations[0].name
+              : op.product.name,
+        },
+      })),
+    }));
   }
 
   async quickPurchase(
     fullName: string,
     phoneNumber: string,
     productId: number,
-  ) {
+  ): Promise<{ success: boolean; message: string }> {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
@@ -204,24 +187,15 @@ export class OrdersService {
     }
 
     const message = `Запрос на быструю покупку:\nПользователь: ${fullName}\nТелефон: ${phoneNumber}\nТовар: ${product.name}`;
-
     await this.sendWhatsAppMessage(message);
 
     return { success: true, message: 'Запрос на быструю покупку отправлен' };
   }
 
-  // Получение одного заказа
-  async getOrderById(orderId: number) {
-    return this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        products: true,
-      },
-    });
-  }
-
-  // Обновление состояния заказа
-  async updateOrderStatus(orderId: number, status: OrderStatus) {
+  async updateOrderStatus(
+    orderId: number,
+    status: OrderStatus,
+  ): Promise<Order> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { user: true },
@@ -249,10 +223,10 @@ export class OrdersService {
 
     return updatedOrder;
   }
-  // Генерация текста уведомления для разных статусов заказа
+
   private getNotificationMessageForStatus(
     status: OrderStatus,
-    order: any,
+    order: Order,
   ): string {
     switch (status) {
       case OrderStatus.PENDING:
@@ -265,11 +239,69 @@ export class OrdersService {
         return `Ваш заказ №${order.id} был успешно завершен. Спасибо за покупку!`;
       case OrderStatus.CANCELED:
         return `Ваш заказ №${order.id} был отменен. Если у вас есть вопросы, свяжитесь с поддержкой.`;
+      default:
+        return `Статус заказа №${order.id} обновлен.`;
     }
   }
 
-  @Cron('0 0 * * *') // Выполняется ежедневно в полночь
-  async processHoldingBonuses() {
+  private async sendWhatsAppMessage(message: string): Promise<void> {
+    try {
+      await this.twilioClient.messages.create({
+        from: 'whatsapp:+14155238886',
+        to: this.companyWhatsAppNumber,
+        body: message,
+      });
+      console.log('Сообщение отправлено на WhatsApp');
+    } catch (error) {
+      console.error('Ошибка при отправке сообщения:', error);
+    }
+  }
+
+  private createWhatsAppMessage(
+    orderData: CreateOrderDto,
+    products: { product: Product; quantity: number }[],
+    totalAmount: number,
+  ): string {
+    let message = `Новый заказ!\n\n`;
+
+    if (orderData.legalEntityInfo) {
+      message += `=== ЮРИДИЧЕСКОЕ ЛИЦО ===\n`;
+      message += `Компания: ${orderData.legalEntityInfo.companyName}\n`;
+      message += `БИН: ${orderData.legalEntityInfo.bin}\n`;
+      message += `Юр. адрес: ${orderData.legalEntityInfo.companyAddress}\n`;
+      message += `Почтовый индекс: ${orderData.legalEntityInfo.postalCode}\n`;
+      message += `Телефон компании: ${orderData.legalEntityInfo.companyPhone}\n`;
+      message += `ИИК: ${orderData.legalEntityInfo.iik}\n`;
+      message += `БИК: ${orderData.legalEntityInfo.bik}\n`;
+      message += `Банк: ${orderData.legalEntityInfo.bankName}\n\n`;
+    }
+
+    message += `=== КОНТАКТНАЯ ИНФОРМАЦИЯ ===\n`;
+    message += `Имя: ${orderData.fullName}\n`;
+    message += `Телефон: ${orderData.phoneNumber}\n`;
+    message += `Email: ${orderData.email}\n\n`;
+
+    message += `=== АДРЕС ДОСТАВКИ ===\n`;
+    message += `Город: ${orderData.address.city}\n`;
+    message += `Улица: ${orderData.address.street}\n`;
+    message += `Дом: ${orderData.address.houseNumber}\n`;
+    message += `Подъезд: ${orderData.address.entrance || 'Не указан'}\n`;
+    message += `Квартира: ${orderData.address.apartment || 'Не указана'}\n\n`;
+
+    message += `=== ИНФОРМАЦИЯ О ЗАКАЗЕ ===\n`;
+    message += `Способ оплаты: ${orderData.paymentData.paymentMethod.join(', ')}\n`;
+    message += `Общая стоимость: ${totalAmount}₸\n\n`;
+
+    message += `=== ТОВАРЫ ===\n`;
+    products.forEach((item) => {
+      message += `- ${item.product.name}, Количество: ${item.quantity}\n`;
+    });
+
+    return message;
+  }
+
+  @Cron('0 0 * * *')
+  async processHoldingBonuses(): Promise<void> {
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
@@ -294,17 +326,5 @@ export class OrdersService {
         },
       });
     }
-  }
-
-  async getAllOrders() {
-    return this.prisma.order.findMany({
-      include: {
-        products: {
-          include: {
-            product: true, // Включаем информацию о продукте
-          },
-        },
-      },
-    });
   }
 }

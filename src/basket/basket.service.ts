@@ -96,7 +96,7 @@ export class BasketService {
   }
 
   // Получить все продукты в корзине пользователя
-  async getBasketProducts(userId: number) {
+  async getBasketProducts(userId: number, language?: string) {
     return this.prisma.basketProduct.findMany({
       where: {
         basket: {
@@ -104,7 +104,24 @@ export class BasketService {
         },
       },
       include: {
-        product: true,
+        product: {
+          include: {
+            translations: language
+              ? {
+                  where: { language: language as any },
+                }
+              : true,
+            productInfo: {
+              include: {
+                translations: language
+                  ? {
+                      where: { language: language as any },
+                    }
+                  : true,
+              },
+            },
+          },
+        },
       },
     });
   }

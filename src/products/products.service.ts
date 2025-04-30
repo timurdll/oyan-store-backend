@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Product } from '@prisma/client';
+import { Product, Language, PreOrder } from '@prisma/client';
 import slugify from 'slugify';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import * as twilio from 'twilio';
@@ -91,47 +91,128 @@ export class ProductsService {
     });
   }
 
-  async getAllProducts(): Promise<Product[]> {
-    return this.prisma.product.findMany({
+  async getAllProducts(language?: Language): Promise<any[]> {
+    const products = await this.prisma.product.findMany({
       include: {
-        productInfo: true,
         ratings: true,
         productCharacteristics: {
           include: { characteristic: true },
         },
-      },
-    });
-  }
-  // async getProductById(id: number): Promise<Product | null> {
-  //   return this.prisma.product.findUnique({
-  //     where: {
-  //       id, // Ensure `id` is correctly passed
-  //     },
-  //     include: {
-  //       productInfo: true,
-  //       ratings: true,
-  //       productCharacteristics: {
-  //         include: {
-  //           characteristic: true,
-  //         },
-  //       },
-  //     },
-  //   });
-  // }
-  async getProductById(id: number): Promise<Product | null> {
-    return this.prisma.product.findUnique({
-      where: { id },
-      include: {
-        productInfo: true,
-        ratings: true,
-        productCharacteristics: {
-          include: { characteristic: true },
+        translations: language
+          ? {
+              where: { language },
+            }
+          : true,
+        productInfo: {
+          include: {
+            translations: language
+              ? {
+                  where: { language },
+                }
+              : true,
+          },
         },
       },
     });
+
+    // Если указан язык, применяем переводы
+    if (language) {
+      return products.map((product) => {
+        const productTranslation = product.translations?.find(
+          (t) => t.language === language,
+        );
+
+        const productInfoTranslation = product.productInfo?.translations?.find(
+          (t) => t.language === language,
+        );
+
+        return {
+          ...product,
+          name: productTranslation?.name || product.name,
+          originalName: product.name,
+          productInfo: product.productInfo
+            ? {
+                ...product.productInfo,
+                title:
+                  productInfoTranslation?.title || product.productInfo.title,
+                description:
+                  productInfoTranslation?.description ||
+                  product.productInfo.description,
+                originalTitle: product.productInfo.title,
+                originalDescription: product.productInfo.description,
+              }
+            : null,
+          translation: productTranslation || null,
+          productInfoTranslation: productInfoTranslation || null,
+        };
+      });
+    }
+
+    return products;
   }
 
-  // В ProductsService
+  async getProductById(id: number, language?: Language): Promise<any> {
+    const product = await this.prisma.product.findUnique({
+      where: {
+        id: id,
+      },
+      include: {
+        ratings: true,
+        productCharacteristics: {
+          include: { characteristic: true },
+        },
+        translations: language
+          ? {
+              where: { language },
+            }
+          : true,
+        productInfo: {
+          include: {
+            translations: language
+              ? {
+                  where: { language },
+                }
+              : true,
+          },
+        },
+      },
+    });
+
+    if (!product) return null;
+
+    // Если указан язык, применяем переводы
+    if (language) {
+      const productTranslation = product.translations?.find(
+        (t) => t.language === language,
+      );
+
+      const productInfoTranslation = product.productInfo?.translations?.find(
+        (t) => t.language === language,
+      );
+
+      return {
+        ...product,
+        name: productTranslation?.name || product.name,
+        originalName: product.name,
+        productInfo: product.productInfo
+          ? {
+              ...product.productInfo,
+              title: productInfoTranslation?.title || product.productInfo.title,
+              description:
+                productInfoTranslation?.description ||
+                product.productInfo.description,
+              originalTitle: product.productInfo.title,
+              originalDescription: product.productInfo.description,
+            }
+          : null,
+        translation: productTranslation || null,
+        productInfoTranslation: productInfoTranslation || null,
+      };
+    }
+
+    return product;
+  }
+
   async updateProduct(
     id: number,
     data: {
@@ -341,24 +422,94 @@ export class ProductsService {
     }
   }
 
-  async getProductBySlug(slug: string): Promise<Product | null> {
-    // Преобразуем `slug` обратно в имя для поиска в базе данных
+  async getProductBySlug(slug: string, language?: Language): Promise<any> {
+    // Get all products with their information and translations
     const allProducts = await this.prisma.product.findMany({
       include: {
-        productInfo: true,
+        productInfo: {
+          include: {
+            translations: language
+              ? {
+                  where: { language },
+                }
+              : true,
+          },
+        },
         ratings: true,
         productCharacteristics: {
-          include: { characteristic: true },
+          include: {
+            characteristic: {
+              include: {
+                translations: language
+                  ? {
+                      where: { language },
+                    }
+                  : true,
+              },
+            },
+            translations: language
+              ? {
+                  where: { language },
+                }
+              : true,
+          },
         },
+        translations: language
+          ? {
+              where: { language },
+            }
+          : true,
       },
     });
 
-    // Ищем продукт, где `slugify(product.name)` соответствует `slug`
-    return (
-      allProducts.find(
-        (product) => slugify(product.name, { lower: true }) === slug,
-      ) || null
+    // Find the product where slugify(product.name) matches slug
+    const product = allProducts.find(
+      (product) => slugify(product.name, { lower: true }) === slug,
     );
+
+    if (!product) return null;
+
+    // If language is specified, apply translations
+    if (language) {
+      const productTranslation = product.translations?.find(
+        (t) => t.language === language,
+      );
+
+      const productInfoTranslation = product.productInfo?.translations?.find(
+        (t) => t.language === language,
+      );
+
+      return {
+        ...product,
+        name: productTranslation?.name || product.name,
+        originalName: product.name,
+        productInfo: product.productInfo
+          ? {
+              ...product.productInfo,
+              title: productInfoTranslation?.title || product.productInfo.title,
+              description:
+                productInfoTranslation?.description ||
+                product.productInfo.description,
+              originalTitle: product.productInfo.title,
+              originalDescription: product.productInfo.description,
+            }
+          : null,
+        productCharacteristics: product.productCharacteristics.map((char) => ({
+          ...char,
+          characteristic: {
+            ...char.characteristic,
+            name:
+              char.characteristic.translations?.[0]?.name ||
+              char.characteristic.name,
+          },
+          description: char.translations?.[0]?.description || char.description,
+        })),
+        translation: productTranslation || null,
+        productInfoTranslation: productInfoTranslation || null,
+      };
+    }
+
+    return product;
   }
   async createPreOrder(userId: number, productId: number, phoneNumber: string) {
     // Найти товар по ID, чтобы получить его название

@@ -8,6 +8,7 @@ import {
   Req,
   Body,
   Put,
+  Query,
 } from '@nestjs/common';
 import { BasketService } from './basket.service';
 import { AuthGuard } from 'src/guards/jwt-auth.guard';
@@ -45,9 +46,12 @@ export class BasketController {
 
   // Получение всех продуктов в корзине пользователя
   @Get()
-  async getBasketProducts(@Req() req: Request) {
+  async getBasketProducts(
+    @Req() req: Request,
+    @Query('language') language?: string,
+  ) {
     const userId = req.user['userId'];
-    return this.basketService.getBasketProducts(userId);
+    return this.basketService.getBasketProducts(userId, language);
   }
 
   // Обновление количества продукта в корзине

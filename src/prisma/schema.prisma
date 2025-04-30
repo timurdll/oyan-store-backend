@@ -71,6 +71,9 @@ model Product {
   halyqLink              String?
   kaspiLink              String?
   satuLink               String?
+
+  // Связь с переводами
+  translations           ProductTranslation[]
 }
 
 
@@ -80,6 +83,9 @@ model ProductInfo {
   product    Product  @relation(fields: [product_id], references: [id])
   title      String
   description String
+  
+  // Связь с переводами
+  translations   ProductInfoTranslation[]
 }
 
 model Rating {
@@ -98,6 +104,9 @@ model Type {
   name            String
   products        Product[] 
   characteristics Characteristic[]
+  
+  // Связь с переводами
+  translations    TypeTranslation[]
 }
 
 model Characteristic {
@@ -106,6 +115,9 @@ model Characteristic {
   type            Type                    @relation(fields: [typeId], references: [id])
   typeId          Int
   productCharacteristics ProductCharacteristic[]
+  
+  // Связь с переводами
+  translations    CharacteristicTranslation[]
 }
 
 model ProductCharacteristic {
@@ -115,6 +127,9 @@ model ProductCharacteristic {
   productId       Int
   characteristic  Characteristic          @relation(fields: [characteristicId], references: [id])
   characteristicId Int
+  
+  // Связь с переводами
+  translations    ProductCharacteristicTranslation[]
 }
 model Favorite {
   id         Int      @id @default(autoincrement())
@@ -172,4 +187,68 @@ model PreOrder {
   user       User     @relation(fields: [userId], references: [id])
   product    Product  @relation(fields: [productId], references: [id])
   createdAt  DateTime @default(now())
+}
+
+// Модели для поддержки переводов
+
+// Поддерживаемые языки
+enum Language {
+  RU    // Русский (по умолчанию)
+  KK    // Казахский
+}
+
+// Перевод для товара
+model ProductTranslation {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  language  Language
+  name      String
+  
+  @@unique([productId, language])
+}
+
+// Перевод для информации о товаре
+model ProductInfoTranslation {
+  id           Int         @id @default(autoincrement())
+  productInfoId Int
+  productInfo  ProductInfo @relation(fields: [productInfoId], references: [id], onDelete: Cascade)
+  language     Language
+  title        String
+  description  String
+  
+  @@unique([productInfoId, language])
+}
+
+// Перевод для типа товара
+model TypeTranslation {
+  id        Int      @id @default(autoincrement())
+  typeId    Int
+  type      Type     @relation(fields: [typeId], references: [id], onDelete: Cascade)
+  language  Language
+  name      String
+  
+  @@unique([typeId, language])
+}
+
+// Перевод для характеристики
+model CharacteristicTranslation {
+  id               Int             @id @default(autoincrement())
+  characteristicId Int
+  characteristic   Characteristic  @relation(fields: [characteristicId], references: [id], onDelete: Cascade)
+  language         Language
+  name             String
+  
+  @@unique([characteristicId, language])
+}
+
+// Перевод для значения характеристики продукта
+model ProductCharacteristicTranslation {
+  id                     Int                   @id @default(autoincrement())
+  productCharacteristicId Int
+  productCharacteristic  ProductCharacteristic @relation(fields: [productCharacteristicId], references: [id], onDelete: Cascade)
+  language               Language
+  description            String
+  
+  @@unique([productCharacteristicId, language])
 }
