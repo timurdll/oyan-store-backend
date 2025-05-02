@@ -13,19 +13,31 @@ export class SitemapController {
     const products = await this.productsService.getAllProducts();
 
     const staticPages = [
-      'https://oyan-store.kz/',
-      'https://oyan-store.kz/about-us',
+      { path: '/', priority: '1.0' },
+      { path: '/about-us', priority: '0.8' },
     ];
 
+    const languages = ['', '/ru', '/kk'];
+
     const urls = [
-      ...staticPages.map((url) => `<url><loc>${url}</loc></url>`),
-      ...products.map((product) => {
+      ...staticPages.flatMap((page) =>
+        languages.map(
+          (lang) => `<url>
+        <loc>https://oyan-store.kz${lang}${page.path}</loc>
+        <changefreq>weekly</changefreq>
+        <priority>${page.priority}</priority>
+      </url>`,
+        ),
+      ),
+      ...products.flatMap((product) => {
         const slug = slugify(product.name, { lower: true });
-        return `<url>
-        <loc>https://oyan-store.kz/products/${slug}</loc>
+        return languages.map(
+          (lang) => `<url>
+        <loc>https://oyan-store.kz${lang}/products/${slug}</loc>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
-      </url>`;
+      </url>`,
+        );
       }),
     ];
 
