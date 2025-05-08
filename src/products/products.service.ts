@@ -223,7 +223,6 @@ export class ProductsService {
       typeId?: number;
       productInfo?: { title: string; description: string };
       characteristics?: { name: string; description: string }[];
-      // Новые поля для маркетплейс ссылок
       halyqLink?: string;
       kaspiLink?: string;
       satuLink?: string;
@@ -240,65 +239,119 @@ export class ProductsService {
       ...productData
     } = data;
 
-    return this.prisma.$transaction(async (prisma) => {
-      // Шаг 1: Обновление товара с учетом новых полей
-      const product = await prisma.product.update({
-        where: { id },
-        data: {
-          ...productData,
-          cover_image: cover_image || undefined,
-          images: images && images.length > 0 ? images : undefined,
-          price: data.price ? parseFloat(data.price as any) : undefined,
-          typeId: data.typeId ? parseInt(data.typeId as any, 10) : undefined,
-          halyqLink, // Обновляем ссылку "Халык"
-          kaspiLink, // Обновляем ссылку "Каспи"
-          satuLink, // Обновляем ссылку "Сату"
-        },
+    // Проверяем существование продукта
+    const existingProduct = await this.prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!existingProduct) {
+      throw new Error(`Продукт с ID ${id} не найден`);
+    }
+
+    // Проверяем уникальность имени, если оно изменилось
+    if (data.name && data.name !== existingProduct.name) {
+      const productWithSameName = await this.prisma.product.findUnique({
+        where: { name: data.name },
       });
 
-      // Шаг 2: Обновление или создание productInfo
-      if (productInfo) {
-        await prisma.productInfo.upsert({
-          where: { product_id: id },
-          update: productInfo,
-          create: {
-            ...productInfo,
-            product_id: id,
-          },
-        });
+      if (productWithSameName) {
+        throw new Error(`Продукт с названием "${data.name}" уже существует`);
+      }
+    }
+
+    // Проверяем тип продукта, если он указан
+    if (data.typeId) {
+      const typeId = parseInt(data.typeId.toString(), 10);
+      if (isNaN(typeId)) {
+        throw new Error('Некорректный ID типа продукта');
       }
 
-      // Шаг 3: Обработка характеристик
-      if (characteristics && characteristics.length > 0) {
-        await prisma.productCharacteristic.deleteMany({
-          where: { productId: id },
+      const typeExists = await this.prisma.type.findUnique({
+        where: { id: typeId },
+      });
+
+      if (!typeExists) {
+        throw new Error(`Тип продукта с ID ${typeId} не найден`);
+      }
+    }
+
+    try {
+      return await this.prisma.$transaction(async (prisma) => {
+        // Шаг 1: Обновление товара с учетом новых полей
+        const product = await prisma.product.update({
+          where: { id },
+          data: {
+            ...productData,
+            cover_image: cover_image || undefined,
+            images: images && images.length > 0 ? images : undefined,
+            price: data.price ? parseFloat(data.price.toString()) : undefined,
+            typeId: data.typeId
+              ? parseInt(data.typeId.toString(), 10)
+              : undefined,
+            halyqLink,
+            kaspiLink,
+            satuLink,
+          },
         });
 
-        for (const char of characteristics) {
-          if (!char.name || !char.description) continue;
-
-          const existingChar = await prisma.characteristic.findUnique({
-            where: { name: char.name },
-          });
-
-          const characteristic =
-            existingChar ||
-            (await prisma.characteristic.create({
-              data: { name: char.name, typeId: data.typeId || product.typeId },
-            }));
-
-          await prisma.productCharacteristic.create({
-            data: {
-              productId: id,
-              characteristicId: characteristic.id,
-              description: char.description,
+        // Шаг 2: Обновление или создание productInfo
+        if (productInfo) {
+          await prisma.productInfo.upsert({
+            where: { product_id: id },
+            update: productInfo,
+            create: {
+              ...productInfo,
+              product_id: id,
             },
           });
         }
-      }
 
-      return product;
-    });
+        // Шаг 3: Обработка характеристик
+        if (characteristics && characteristics.length > 0) {
+          await prisma.productCharacteristic.deleteMany({
+            where: { productId: id },
+          });
+
+          for (const char of characteristics) {
+            if (!char.name || !char.description) {
+              throw new Error('Название и описание характеристики обязательны');
+            }
+
+            const existingChar = await prisma.characteristic.findUnique({
+              where: { name: char.name },
+            });
+
+            const characteristic =
+              existingChar ||
+              (await prisma.characteristic.create({
+                data: {
+                  name: char.name,
+                  typeId: data.typeId
+                    ? parseInt(data.typeId.toString(), 10)
+                    : product.typeId,
+                },
+              }));
+
+            await prisma.productCharacteristic.create({
+              data: {
+                productId: id,
+                characteristicId: characteristic.id,
+                description: char.description,
+              },
+            });
+          }
+        }
+
+        return product;
+      });
+    } catch (error) {
+      console.error('Ошибка при обновлении продукта:', error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : 'Произошла ошибка при обновлении продукта',
+      );
+    }
   }
 
   async getProductByName(name: string): Promise<Product | null> {

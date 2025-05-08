@@ -187,20 +187,84 @@ export class ProductsController {
       stock?: number;
       productInfo?: { title: string; description: string };
       characteristics?: { name: string; description: string }[];
+      halyqLink?: string;
+      kaspiLink?: string;
+      satuLink?: string;
     },
   ): Promise<Product> {
-    const coverImagePath = files.cover_image
-      ? `/uploads/products/${files.cover_image[0].filename}`
-      : undefined;
+    try {
+      // Валидация ID
+      const productId = parseInt(id, 10);
+      if (isNaN(productId)) {
+        throw new Error('Некорректный ID продукта');
+      }
 
-    const imagesPaths = files.images
-      ? files.images.map((file) => `/uploads/products/${file.filename}`)
-      : undefined;
+      // Валидация цены
+      if (data.price !== undefined && (isNaN(data.price) || data.price < 0)) {
+        throw new Error('Некорректная цена продукта');
+      }
 
-    return this.productsService.updateProduct(+id, {
-      ...data,
-      cover_image: coverImagePath,
-      images: imagesPaths,
-    });
+      // Валидация типа продукта
+      if (data.typeId !== undefined && isNaN(data.typeId)) {
+        throw new Error('Некорректный ID типа продукта');
+      }
+
+      // Валидация количества
+      if (data.stock !== undefined && (isNaN(data.stock) || data.stock < 0)) {
+        throw new Error('Некорректное количество товара');
+      }
+
+      // Валидация информации о продукте
+      if (data.productInfo) {
+        if (!data.productInfo.title?.trim()) {
+          throw new Error('Заголовок продукта не может быть пустым');
+        }
+        if (!data.productInfo.description?.trim()) {
+          throw new Error('Описание продукта не может быть пустым');
+        }
+      }
+
+      // Валидация характеристик
+      if (data.characteristics) {
+        for (const char of data.characteristics) {
+          if (!char.name?.trim()) {
+            throw new Error('Название характеристики не может быть пустым');
+          }
+          if (!char.description?.trim()) {
+            throw new Error('Описание характеристики не может быть пустым');
+          }
+        }
+      }
+
+      // Валидация URL маркетплейсов
+      const urlRegex =
+        /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
+      if (data.halyqLink && !urlRegex.test(data.halyqLink)) {
+        throw new Error('Некорректный URL для Халык');
+      }
+      if (data.kaspiLink && !urlRegex.test(data.kaspiLink)) {
+        throw new Error('Некорректный URL для Каспи');
+      }
+      if (data.satuLink && !urlRegex.test(data.satuLink)) {
+        throw new Error('Некорректный URL для Сату');
+      }
+
+      const coverImagePath = files.cover_image
+        ? `/uploads/products/${files.cover_image[0].filename}`
+        : undefined;
+
+      const imagesPaths = files.images
+        ? files.images.map((file) => `/uploads/products/${file.filename}`)
+        : undefined;
+
+      return this.productsService.updateProduct(productId, {
+        ...data,
+        cover_image: coverImagePath,
+        images: imagesPaths,
+      });
+    } catch (error) {
+      console.error('Ошибка при обновлении продукта:', error);
+      throw error;
+    }
   }
 }
