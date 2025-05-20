@@ -20,6 +20,7 @@ import { Language, PreOrder, Product } from '@prisma/client';
 import { RolesGuard } from 'src/guards/roles.guard';
 import { AuthGuard } from 'src/guards/jwt-auth.guard';
 import { extname } from 'path';
+import { ParseIntPipe } from '@nestjs/common';
 
 @Controller('products')
 export class ProductsController {
@@ -84,7 +85,7 @@ export class ProductsController {
 
   @Get(':id')
   async findOne(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Query('language') language?: Language,
   ): Promise<Product | null> {
     return this.productsService.getProductById(+id, language);

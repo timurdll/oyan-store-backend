@@ -1,4 +1,3 @@
-// sitemap.controller.ts
 import { Controller, Get, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { ProductsService } from 'src/products/products.service';
@@ -17,7 +16,8 @@ export class SitemapController {
       { path: '/about-us', priority: '0.8' },
     ];
 
-    const languages = ['', '/ru', '/kk'];
+    // Удалили '' — теперь только локализованные страницы
+    const languages = ['/ru', '/kk'];
 
     const urls = [
       ...staticPages.flatMap((page) =>
