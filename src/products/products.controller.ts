@@ -12,15 +12,21 @@ import {
   Request,
   UnauthorizedException,
   Query,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { ProductsService } from './products.service';
+import {
+  ProductsService,
+  ProductFilterOptions,
+  ProductSortField,
+  SortOrder,
+} from './products.service';
 import { Language, PreOrder, Product } from '@prisma/client';
 import { RolesGuard } from 'src/guards/roles.guard';
 import { AuthGuard } from 'src/guards/jwt-auth.guard';
 import { extname } from 'path';
-import { ParseIntPipe } from '@nestjs/common';
 
 @Controller('products')
 export class ProductsController {
@@ -57,7 +63,6 @@ export class ProductsController {
       stock: number;
       productInfo?: { title: string; description: string };
       characteristics?: { name: string; description: string }[];
-      // Новые поля для маркетплейс ссылок
       halyqLink?: string;
       kaspiLink?: string;
       satuLink?: string;
@@ -83,6 +88,39 @@ export class ProductsController {
     return this.productsService.getAllProducts(language);
   }
 
+  @Get('filter')
+  async getFilteredProducts(
+    @Query('typeId') typeId?: string,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit?: number,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset?: number,
+    @Query('sortBy', new DefaultValuePipe('name')) sortBy?: ProductSortField,
+    @Query('sortOrder', new DefaultValuePipe('asc')) sortOrder?: SortOrder,
+    @Query('language') language?: Language,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+  ) {
+    // only parse if the client actually passed it
+    const parsedTypeId =
+      typeId !== undefined ? parseInt(typeId, 10) : undefined;
+    const parsedMinPrice =
+      minPrice !== undefined ? parseFloat(minPrice) : undefined;
+    const parsedMaxPrice =
+      maxPrice !== undefined ? parseFloat(maxPrice) : undefined;
+
+    const options: ProductFilterOptions = {
+      typeId: parsedTypeId,
+      limit,
+      offset,
+      sortBy,
+      sortOrder,
+      language,
+      minPrice: parsedMinPrice,
+      maxPrice: parsedMaxPrice,
+    };
+
+    return this.productsService.getFilteredProducts(options);
+  }
+
   @Get(':id')
   async findOne(
     @Param('id', ParseIntPipe) id: number,
@@ -96,8 +134,7 @@ export class ProductsController {
     return this.productsService.deleteProduct(+id);
   }
 
-  // In ProductsController
-  @Get('pre-orders') // Changed from '/pre-order' to 'pre-orders'
+  @Get('pre-orders')
   @UseGuards(AuthGuard)
   async getUserPreOrders(@Request() req): Promise<PreOrder[]> {
     const userId = req.user?.userId;
@@ -107,7 +144,6 @@ export class ProductsController {
     return this.productsService.getUserPreOrders(userId);
   }
 
-  // Добавление характеристик к продукту
   @Post(':id/characteristics')
   async addCharacteristics(
     @Param('id') productId: string,
@@ -116,7 +152,7 @@ export class ProductsController {
     await this.productsService.addCharacteristics(+productId, characteristics);
   }
 
-  @Get('name/:name') // Новый маршрут
+  @Get('name/:name')
   async getProductByName(@Param('name') name: string): Promise<Product | null> {
     return this.productsService.getProductByName(name);
   }
@@ -137,20 +173,22 @@ export class ProductsController {
     const { stock } = data;
     return this.productsService.updateStock(+id, stock);
   }
+
   @Post(':id/pre-order')
   @UseGuards(AuthGuard)
   async createPreOrder(
     @Param('id') productId: string,
     @Request() req,
-    @Body() body: { phoneNumber: string }, // Change type to an object with phoneNumber
+    @Body() body: { phoneNumber: string },
   ): Promise<PreOrder> {
     const userId = req.user['userId'];
     return this.productsService.createPreOrder(
       userId,
       +productId,
       body.phoneNumber,
-    ); // Extract phoneNumber from body
+    );
   }
+
   @Put(':id')
   @UseInterceptors(
     FileFieldsInterceptor(

@@ -1,23 +1,33 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Product, Language, PreOrder } from '@prisma/client';
+import { Product, Language, PreOrder, Prisma } from '@prisma/client';
 import slugify from 'slugify';
-import { NotificationsService } from 'src/notifications/notifications.service';
-import * as twilio from 'twilio';
+import { ProductCharacteristicsService } from './product-characteristics.service';
+import { ProductPreOrderService } from './product-pre-order.service';
+import { ProductTranslationService } from './product-translation.service';
+
+export type ProductSortField = 'price' | 'name' | 'createdAt' | 'rating';
+export type SortOrder = 'asc' | 'desc';
+
+export interface ProductFilterOptions {
+  typeId?: number;
+  limit?: number;
+  offset?: number;
+  sortBy?: ProductSortField;
+  sortOrder?: SortOrder;
+  language?: Language;
+  minPrice?: number;
+  maxPrice?: number;
+}
 
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notificationsService: NotificationsService,
+    private readonly characteristicsService: ProductCharacteristicsService,
+    private readonly preOrderService: ProductPreOrderService,
+    private readonly translationService: ProductTranslationService,
   ) {}
-
-  private twilioClient = twilio(
-    process.env.TWILIO_SID, // SID из переменных окружения
-    process.env.TWILIO_AUTH_TOKEN, // Auth Token из переменных окружения
-  );
-
-  private companyWhatsAppNumber = process.env.COMPANY_WHATSAPP_NUMBER;
 
   async createProduct(data: {
     name: string;
@@ -31,7 +41,6 @@ export class ProductsService {
     };
     stock: number;
     characteristics?: { name: string; description: string }[];
-    // Новые поля для маркетплейс ссылок
     halyqLink?: string;
     kaspiLink?: string;
     satuLink?: string;
@@ -46,47 +55,29 @@ export class ProductsService {
     } = data;
 
     return this.prisma.$transaction(async (prisma) => {
-      // Шаг 1: Создание товара с добавлением ссылок на маркетплейсы
+      // Step 1: Create product with marketplace links
       const product = await prisma.product.create({
         data: {
           ...productData,
           price: parseFloat(data.price as string),
           typeId: parseInt(data.typeId as string, 10),
           stock: data.stock,
-          halyqLink, // Ссылка на маркетплейс "Халык"
-          kaspiLink, // Ссылка на маркетплейс "Каспи"
-          satuLink, // Ссылка на маркетплейс "Сату"
+          halyqLink,
+          kaspiLink,
+          satuLink,
           productInfo: productInfo ? { create: productInfo } : undefined,
         },
       });
 
-      // Шаг 2: Обработка характеристик
+      // Step 2: Process characteristics
       if (characteristics && characteristics.length > 0) {
-        for (const char of characteristics) {
-          if (!char.name || !char.description) continue;
-
-          const existingChar = await prisma.characteristic.findUnique({
-            where: { name: char.name },
-          });
-
-          const characteristic =
-            existingChar ||
-            (await prisma.characteristic.create({
-              data: {
-                name: char.name,
-                typeId: parseInt(data.typeId as string, 10),
-              },
-            }));
-
-          await prisma.productCharacteristic.create({
-            data: {
-              productId: product.id,
-              characteristicId: characteristic.id,
-              description: char.description,
-            },
-          });
-        }
+        await this.characteristicsService.updateProductCharacteristics(
+          product.id,
+          characteristics,
+          parseInt(data.typeId as string, 10),
+        );
       }
+
       return product;
     });
   }
@@ -115,47 +106,15 @@ export class ProductsService {
       },
     });
 
-    // Если указан язык, применяем переводы
-    if (language) {
-      return products.map((product) => {
-        const productTranslation = product.translations?.find(
-          (t) => t.language === language,
-        );
-
-        const productInfoTranslation = product.productInfo?.translations?.find(
-          (t) => t.language === language,
-        );
-
-        return {
-          ...product,
-          name: productTranslation?.name || product.name,
-          originalName: product.name,
-          productInfo: product.productInfo
-            ? {
-                ...product.productInfo,
-                title:
-                  productInfoTranslation?.title || product.productInfo.title,
-                description:
-                  productInfoTranslation?.description ||
-                  product.productInfo.description,
-                originalTitle: product.productInfo.title,
-                originalDescription: product.productInfo.description,
-              }
-            : null,
-          translation: productTranslation || null,
-          productInfoTranslation: productInfoTranslation || null,
-        };
-      });
-    }
-
-    return products;
+    // Apply translations if language is specified
+    return language
+      ? this.translationService.applyTranslationsToMany(products, language)
+      : products;
   }
 
   async getProductById(id: number, language?: Language): Promise<any> {
     const product = await this.prisma.product.findUnique({
-      where: {
-        id: id,
-      },
+      where: { id },
       include: {
         ratings: true,
         productCharacteristics: {
@@ -180,37 +139,10 @@ export class ProductsService {
 
     if (!product) return null;
 
-    // Если указан язык, применяем переводы
-    if (language) {
-      const productTranslation = product.translations?.find(
-        (t) => t.language === language,
-      );
-
-      const productInfoTranslation = product.productInfo?.translations?.find(
-        (t) => t.language === language,
-      );
-
-      return {
-        ...product,
-        name: productTranslation?.name || product.name,
-        originalName: product.name,
-        productInfo: product.productInfo
-          ? {
-              ...product.productInfo,
-              title: productInfoTranslation?.title || product.productInfo.title,
-              description:
-                productInfoTranslation?.description ||
-                product.productInfo.description,
-              originalTitle: product.productInfo.title,
-              originalDescription: product.productInfo.description,
-            }
-          : null,
-        translation: productTranslation || null,
-        productInfoTranslation: productInfoTranslation || null,
-      };
-    }
-
-    return product;
+    // Apply translations if language is specified
+    return language
+      ? this.translationService.applyTranslations(product, language)
+      : product;
   }
 
   async updateProduct(
@@ -239,31 +171,31 @@ export class ProductsService {
       ...productData
     } = data;
 
-    // Проверяем существование продукта
+    // Check if product exists
     const existingProduct = await this.prisma.product.findUnique({
       where: { id },
     });
 
     if (!existingProduct) {
-      throw new Error(`Продукт с ID ${id} не найден`);
+      throw new Error(`Product with ID ${id} not found`);
     }
 
-    // Проверяем уникальность имени, если оно изменилось
+    // Check name uniqueness if changed
     if (data.name && data.name !== existingProduct.name) {
       const productWithSameName = await this.prisma.product.findUnique({
         where: { name: data.name },
       });
 
       if (productWithSameName) {
-        throw new Error(`Продукт с названием "${data.name}" уже существует`);
+        throw new Error(`Product with name "${data.name}" already exists`);
       }
     }
 
-    // Проверяем тип продукта, если он указан
+    // Check product type if specified
     if (data.typeId) {
       const typeId = parseInt(data.typeId.toString(), 10);
       if (isNaN(typeId)) {
-        throw new Error('Некорректный ID типа продукта');
+        throw new Error('Invalid product type ID');
       }
 
       const typeExists = await this.prisma.type.findUnique({
@@ -271,13 +203,13 @@ export class ProductsService {
       });
 
       if (!typeExists) {
-        throw new Error(`Тип продукта с ID ${typeId} не найден`);
+        throw new Error(`Product type with ID ${typeId} not found`);
       }
     }
 
     try {
       return await this.prisma.$transaction(async (prisma) => {
-        // Шаг 1: Обновление товара с учетом новых полей
+        // Step 1: Update product with new fields
         const product = await prisma.product.update({
           where: { id },
           data: {
@@ -294,7 +226,7 @@ export class ProductsService {
           },
         });
 
-        // Шаг 2: Обновление или создание productInfo
+        // Step 2: Update or create productInfo
         if (productInfo) {
           await prisma.productInfo.upsert({
             where: { product_id: id },
@@ -306,50 +238,23 @@ export class ProductsService {
           });
         }
 
-        // Шаг 3: Обработка характеристик
+        // Step 3: Process characteristics
         if (characteristics && characteristics.length > 0) {
-          await prisma.productCharacteristic.deleteMany({
-            where: { productId: id },
-          });
-
-          for (const char of characteristics) {
-            if (!char.name || !char.description) {
-              throw new Error('Название и описание характеристики обязательны');
-            }
-
-            const existingChar = await prisma.characteristic.findUnique({
-              where: { name: char.name },
-            });
-
-            const characteristic =
-              existingChar ||
-              (await prisma.characteristic.create({
-                data: {
-                  name: char.name,
-                  typeId: data.typeId
-                    ? parseInt(data.typeId.toString(), 10)
-                    : product.typeId,
-                },
-              }));
-
-            await prisma.productCharacteristic.create({
-              data: {
-                productId: id,
-                characteristicId: characteristic.id,
-                description: char.description,
-              },
-            });
-          }
+          await this.characteristicsService.updateProductCharacteristics(
+            id,
+            characteristics,
+            data.typeId ? parseInt(data.typeId.toString(), 10) : undefined,
+          );
         }
 
         return product;
       });
     } catch (error) {
-      console.error('Ошибка при обновлении продукта:', error);
+      console.error('Error updating product:', error);
       throw new Error(
         error instanceof Error
           ? error.message
-          : 'Произошла ошибка при обновлении продукта',
+          : 'An error occurred while updating the product',
       );
     }
   }
@@ -369,81 +274,34 @@ export class ProductsService {
 
   async deleteProduct(id: number): Promise<Product> {
     return this.prisma.$transaction(async (prisma) => {
-      // Delete related ProductInfo, if it exists
+      // Delete related entities
       await prisma.productInfo.deleteMany({
         where: { product_id: id },
       });
 
-      // Delete related BasketProduct entries
       await prisma.basketProduct.deleteMany({
         where: { product_id: id },
       });
 
-      // Delete related ProductCharacteristics entries
       await prisma.productCharacteristic.deleteMany({
         where: { productId: id },
       });
 
-      // Delete related Rating entries
       await prisma.rating.deleteMany({
         where: { product_id: id },
       });
 
-      // Delete related Favorite entries
       await prisma.favorite.deleteMany({
         where: { product_id: id },
       });
 
-      // Finally, delete the Product itself
+      // Delete the Product itself
       return prisma.product.delete({
         where: { id },
       });
     });
   }
-  async updateProductStock(productId: number, stock: number): Promise<Product> {
-    return this.prisma.product.update({
-      where: { id: productId },
-      data: { stock },
-    });
-  }
 
-  async addCharacteristics(
-    productId: number,
-    characteristics: { name: string; description: string; typeId?: number }[],
-  ) {
-    // Retrieve `typeId` from the product if not provided
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
-      select: { typeId: true },
-    });
-
-    if (!product) {
-      throw new Error(`Product with ID ${productId} not found`);
-    }
-
-    for (const char of characteristics) {
-      const typeId = char.typeId ?? product.typeId; // Use provided `typeId` or fallback to product's `typeId`
-
-      // Find or create the characteristic by `name` and `typeId`
-      const characteristic = await this.prisma.characteristic.upsert({
-        where: { name: char.name },
-        update: {},
-        create: {
-          name: char.name,
-          typeId,
-        },
-      });
-
-      // Add a record in `ProductCharacteristic`
-      await this.prisma.productCharacteristic.create({
-        data: {
-          productId,
-          characteristicId: characteristic.id,
-          description: char.description,
-        },
-      });
-    }
-  }
   async updateStock(productId: number, newStock: number): Promise<Product> {
     if (newStock < 0) {
       throw new Error('Stock cannot be negative');
@@ -454,25 +312,12 @@ export class ProductsService {
       data: { stock: newStock },
     });
 
-    // Если количество товара увеличилось, уведомить пользователей
+    // Notify pre-order users if stock increased
     if (newStock > 0) {
-      await this.notifyPreOrderUsers(productId);
+      await this.preOrderService.notifyPreOrderUsers(productId);
     }
 
     return product;
-  }
-
-  private async sendWhatsAppMessage(message: string) {
-    try {
-      await this.twilioClient.messages.create({
-        from: 'whatsapp:+14155238886', // Ваш Twilio номер WhatsApp
-        to: this.companyWhatsAppNumber, // Номер компании, на который отправляется сообщение
-        body: message,
-      });
-      console.log('Сообщение отправлено на WhatsApp');
-    } catch (error) {
-      console.error('Ошибка при отправке сообщения:', error);
-    }
   }
 
   async getProductBySlug(slug: string, language?: Language): Promise<any> {
@@ -515,124 +360,149 @@ export class ProductsService {
       },
     });
 
-    // Find the product where slugify(product.name) matches slug
+    // Find product where slugify(product.name) matches slug
     const product = allProducts.find(
       (product) => slugify(product.name, { lower: true }) === slug,
     );
 
     if (!product) return null;
 
-    // If language is specified, apply translations
-    if (language) {
-      const productTranslation = product.translations?.find(
-        (t) => t.language === language,
-      );
-
-      const productInfoTranslation = product.productInfo?.translations?.find(
-        (t) => t.language === language,
-      );
-
-      return {
-        ...product,
-        name: productTranslation?.name || product.name,
-        originalName: product.name,
-        productInfo: product.productInfo
-          ? {
-              ...product.productInfo,
-              title: productInfoTranslation?.title || product.productInfo.title,
-              description:
-                productInfoTranslation?.description ||
-                product.productInfo.description,
-              originalTitle: product.productInfo.title,
-              originalDescription: product.productInfo.description,
-            }
-          : null,
-        productCharacteristics: product.productCharacteristics.map((char) => ({
-          ...char,
-          characteristic: {
-            ...char.characteristic,
-            name:
-              char.characteristic.translations?.[0]?.name ||
-              char.characteristic.name,
-          },
-          description: char.translations?.[0]?.description || char.description,
-        })),
-        translation: productTranslation || null,
-        productInfoTranslation: productInfoTranslation || null,
-      };
-    }
-
-    return product;
-  }
-  async createPreOrder(userId: number, productId: number, phoneNumber: string) {
-    // Найти товар по ID, чтобы получить его название
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
-      select: { name: true }, // Запрашиваем только поле name
-    });
-
-    if (!product) {
-      throw new Error(`Товар с ID ${productId} не найден`);
-    }
-
-    // Создать предзаказ
-    const preOrder = await this.prisma.preOrder.create({
-      data: { userId, productId },
-    });
-
-    // Отправить сообщение через WhatsApp
-    const message = `Клиент с номером ${phoneNumber} сделал предзаказ на товар "${product.name}"`;
-    await this.sendWhatsAppMessage(message);
-
-    return preOrder;
+    // Apply translations if language is specified
+    return language
+      ? this.translationService.applyTranslations(product, language)
+      : product;
   }
 
-  async notifyPreOrderUsers(productId: number) {
-    // Find all pre-orders for this product
-    const preOrders = await this.prisma.preOrder.findMany({
-      where: { productId },
-      include: {
-        user: true,
-        product: true, // Add this to include product details
-      },
-    });
-
-    // Send notifications and delete pre-orders
-    for (const preOrder of preOrders) {
-      await this.notificationsService.createNotification(
-        preOrder.userId,
-        `Товар "${preOrder.product.name}" теперь доступен!`,
-      );
-
-      // Optional: Delete pre-order after notification
-      await this.prisma.preOrder.delete({
-        where: { id: preOrder.id },
-      });
-    }
+  // Delegate to PreOrderService
+  async createPreOrder(
+    userId: number,
+    productId: number,
+    phoneNumber: string,
+  ): Promise<PreOrder> {
+    return this.preOrderService.createPreOrder(userId, productId, phoneNumber);
   }
 
-  // In ProductsService
+  // Delegate to PreOrderService
   async getUserPreOrders(userId: number) {
-    if (!userId) {
-      throw new BadRequestException('User ID is required');
+    return this.preOrderService.getUserPreOrders(userId);
+  }
+
+  // Delegate to CharacteristicsService
+  async addCharacteristics(
+    productId: number,
+    characteristics: { name: string; description: string; typeId?: number }[],
+  ): Promise<void> {
+    return this.characteristicsService.addCharacteristics(
+      productId,
+      characteristics,
+    );
+  }
+
+  // Enhanced filtered products method with sorting and pagination
+  async getFilteredProducts(options: ProductFilterOptions = {}) {
+    const {
+      typeId,
+      limit = 10,
+      offset = 0,
+      sortBy = 'name',
+      sortOrder = 'asc',
+      language,
+      minPrice,
+      maxPrice,
+    } = options;
+
+    // Validate sort field
+    const validSortFields: ProductSortField[] = [
+      'price',
+      'name',
+      'rating',
+      'createdAt',
+    ];
+    if (sortBy && !validSortFields.includes(sortBy as ProductSortField)) {
+      throw new BadRequestException(
+        `Invalid sort field. Valid options are: ${validSortFields.join(', ')}`,
+      );
     }
 
-    return this.prisma.preOrder.findMany({
-      where: {
-        userId: userId,
-      },
+    // Validate sort order
+    const validSortOrders: SortOrder[] = ['asc', 'desc'];
+    if (sortOrder && !validSortOrders.includes(sortOrder as SortOrder)) {
+      throw new BadRequestException(
+        `Invalid sort order. Valid options are: ${validSortOrders.join(', ')}`,
+      );
+    }
+
+    // Build the order by condition
+    const orderBy: any = {};
+    orderBy[sortBy] = sortOrder;
+
+    // Build the where condition for products (с учётом цены)
+    const where: Prisma.ProductWhereInput = {};
+    if (typeId) {
+      where.typeId = typeId;
+    }
+    // Формируем price-условие отдельно
+    const price: any = {};
+    if (minPrice !== undefined) {
+      price.gte = minPrice;
+    }
+    if (maxPrice !== undefined) {
+      price.lte = maxPrice;
+    }
+    if (Object.keys(price).length > 0) {
+      where.price = price;
+    }
+
+    // Build the where condition for min/max (БЕЗ учёта цены)
+    const whereForMinMax: Prisma.ProductWhereInput = {};
+    if (typeId) {
+      whereForMinMax.typeId = typeId;
+    }
+
+    // Execute the query with pagination
+    const products = await this.prisma.product.findMany({
+      where,
+      take: limit,
+      skip: offset,
+      orderBy,
       include: {
-        product: {
+        translations: language ? { where: { language } } : true,
+        type: {
+          include: { translations: language ? { where: { language } } : true },
+        },
+        productInfo: {
           include: {
-            productInfo: true,
-            productCharacteristics: {
-              include: {
-                characteristic: true,
-              },
-            },
+            translations: language ? { where: { language } } : true,
           },
         },
       },
     });
+
+    // Get total count for pagination metadata
+    const totalCount = await this.prisma.product.count({ where });
+
+    // Получаем min и max цену по всем товарам, подходящим под фильтр (без учёта цены)
+    const minMax = await this.prisma.product.aggregate({
+      where: whereForMinMax,
+      _min: { price: true },
+      _max: { price: true },
+    });
+
+    // Apply translations if language is specified
+    const translatedProducts = language
+      ? this.translationService.applyTranslationsToMany(products, language)
+      : products;
+
+    return {
+      products: translatedProducts,
+      pagination: {
+        total: totalCount,
+        limit,
+        offset,
+        hasMore: offset + limit < totalCount,
+      },
+      minPrice: minMax._min.price ?? 0,
+      maxPrice: minMax._max.price ?? 0,
+    };
   }
 }
