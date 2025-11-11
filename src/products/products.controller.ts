@@ -4,6 +4,8 @@ import {
   Post,
   Body,
   Param,
+  ParseIntPipe,
+  Query,
   Put,
   Delete,
   UseGuards,
@@ -81,16 +83,6 @@ export class ProductsController {
     return this.productsService.getAllProducts();
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<Product | null> {
-    return this.productsService.getProductById(+id);
-  }
-
-  @Delete(':id')
-  async remove(@Param('id') id: string): Promise<Product> {
-    return this.productsService.deleteProduct(+id);
-  }
-
   // In ProductsController
   @Get('pre-orders') // Changed from '/pre-order' to 'pre-orders'
   @UseGuards(AuthGuard)
@@ -100,15 +92,6 @@ export class ProductsController {
       throw new UnauthorizedException('User ID not found in token');
     }
     return this.productsService.getUserPreOrders(userId);
-  }
-
-  // Добавление характеристик к продукту
-  @Post(':id/characteristics')
-  async addCharacteristics(
-    @Param('id') productId: string,
-    @Body() characteristics: { name: string; description: string }[],
-  ): Promise<void> {
-    await this.productsService.addCharacteristics(+productId, characteristics);
   }
 
   @Get('name/:name') // Новый маршрут
@@ -121,29 +104,65 @@ export class ProductsController {
     return this.productsService.getProductBySlug(slug);
   }
 
-  @Put(':id/stock')
+  @Get('filter')
+  async filterProducts(
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Query('typeId') typeId?: string,
+    @Query('q') q?: string,
+    @Query('inStock') inStock?: string,
+    @Query('language') language?: string,
+  ): Promise<{ products: Product[]; total: number }> {
+    return this.productsService.filterProducts({
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+      typeId: typeId ? parseInt(typeId, 10) : undefined,
+      q: q || undefined,
+      inStock: inStock === 'true' ? true : inStock === 'false' ? false : undefined,
+      language: language || undefined,
+    });
+  }
+
+  @Get(':id(\\d+)')
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<Product | null> {
+    return this.productsService.getProductById(id);
+  }
+
+  @Delete(':id(\\d+)')
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<Product> {
+    return this.productsService.deleteProduct(id);
+  }
+
+  // Добавление характеристик к продукту
+  @Post(':id(\\d+)/characteristics')
+  async addCharacteristics(
+    @Param('id', ParseIntPipe) productId: number,
+    @Body() characteristics: { name: string; description: string }[],
+  ): Promise<void> {
+    await this.productsService.addCharacteristics(productId, characteristics);
+  }
+
+  @Put(':id(\\d+)/stock')
   async updateStock(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() data: { stock: number },
   ): Promise<Product> {
     const { stock } = data;
-    return this.productsService.updateStock(+id, stock);
+    return this.productsService.updateStock(id, stock);
   }
-  @Post(':id/pre-order')
+  @Post(':id(\\d+)/pre-order')
   @UseGuards(AuthGuard)
   async createPreOrder(
-    @Param('id') productId: string,
+    @Param('id', ParseIntPipe) productId: number,
     @Request() req,
     @Body() body: { phoneNumber: string }, // Change type to an object with phoneNumber
   ): Promise<PreOrder> {
     const userId = req.user['userId'];
-    return this.productsService.createPreOrder(
-      userId,
-      +productId,
-      body.phoneNumber,
-    ); // Extract phoneNumber from body
+    return this.productsService.createPreOrder(userId, productId, body.phoneNumber); // Extract phoneNumber from body
   }
-  @Put(':id')
+  @Put(':id(\\d+)')
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -166,7 +185,7 @@ export class ProductsController {
     ),
   )
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @UploadedFiles()
     files: {
       cover_image?: Express.Multer.File[];
@@ -190,7 +209,7 @@ export class ProductsController {
       ? files.images.map((file) => `/uploads/products/${file.filename}`)
       : undefined;
 
-    return this.productsService.updateProduct(+id, {
+    return this.productsService.updateProduct(id, {
       ...data,
       cover_image: coverImagePath,
       images: imagesPaths,

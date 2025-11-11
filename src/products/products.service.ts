@@ -102,6 +102,54 @@ export class ProductsService {
       },
     });
   }
+  async filterProducts(params: {
+    limit?: number;
+    offset?: number;
+    typeId?: number;
+    q?: string;
+    inStock?: boolean;
+    language?: string; // accepted but currently unused
+  }): Promise<{ products: Product[]; total: number }> {
+    const { limit, offset, typeId, q, inStock } = params;
+    const where: any = {};
+    if (typeof typeId === 'number') {
+      where.typeId = typeId;
+    }
+    if (typeof inStock === 'boolean') {
+      where.stock = inStock ? { gt: 0 } : { lte: 0 };
+    }
+    if (q && q.trim().length > 0) {
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        {
+          productInfo: {
+            is: {
+              OR: [
+                { title: { contains: q, mode: 'insensitive' } },
+                { description: { contains: q, mode: 'insensitive' } },
+              ],
+            },
+          },
+        },
+      ];
+    }
+    const [products, total] = await this.prisma.$transaction([
+      this.prisma.product.findMany({
+        where,
+        take: typeof limit === 'number' ? limit : undefined,
+        skip: typeof offset === 'number' ? offset : undefined,
+        include: {
+          productInfo: true,
+          ratings: true,
+          productCharacteristics: {
+            include: { characteristic: true },
+          },
+        },
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+    return { products, total };
+  }
   // async getProductById(id: number): Promise<Product | null> {
   //   return this.prisma.product.findUnique({
   //     where: {
