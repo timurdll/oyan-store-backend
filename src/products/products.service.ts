@@ -3,21 +3,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Product } from '@prisma/client';
 import slugify from 'slugify';
 import { NotificationsService } from 'src/notifications/notifications.service';
-import * as twilio from 'twilio';
+import { TelegramBotsService } from 'src/telegram-bots/telegram-bots.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly telegramBotsService: TelegramBotsService,
   ) {}
-
-  private twilioClient = twilio(
-    process.env.TWILIO_SID, // SID из переменных окружения
-    process.env.TWILIO_AUTH_TOKEN, // Auth Token из переменных окружения
-  );
-
-  private companyWhatsAppNumber = process.env.COMPANY_WHATSAPP_NUMBER;
 
   async createProduct(data: {
     name: string;
@@ -376,17 +370,8 @@ export class ProductsService {
     return product;
   }
 
-  private async sendWhatsAppMessage(message: string) {
-    try {
-      await this.twilioClient.messages.create({
-        from: 'whatsapp:+14155238886', // Ваш Twilio номер WhatsApp
-        to: this.companyWhatsAppNumber, // Номер компании, на который отправляется сообщение
-        body: message,
-      });
-      console.log('Сообщение отправлено на WhatsApp');
-    } catch (error) {
-      console.error('Ошибка при отправке сообщения:', error);
-    }
+  private async notifyAdminsAboutPreOrder(message: string) {
+    await this.telegramBotsService.sendMessageToActiveBots(message);
   }
 
   async getProductBySlug(slug: string): Promise<Product | null> {
@@ -424,9 +409,9 @@ export class ProductsService {
       data: { userId, productId },
     });
 
-    // Отправить сообщение через WhatsApp
+    // Отправить сообщение через Telegram
     const message = `Клиент с номером ${phoneNumber} сделал предзаказ на товар "${product.name}"`;
-    await this.sendWhatsAppMessage(message);
+    await this.notifyAdminsAboutPreOrder(message);
 
     return preOrder;
   }

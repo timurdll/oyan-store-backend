@@ -173,3 +173,13 @@ model PreOrder {
   product    Product  @relation(fields: [productId], references: [id])
   createdAt  DateTime @default(now())
 }
+
+model TelegramBot {
+  id        Int      @id @default(autoincrement())
+  name      String
+  token     String
+  chatId    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

@@ -14,6 +14,7 @@ import { BasketModule } from './basket/basket.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { OrdersModule } from './orders/orders.module';
 import { SitemapModule } from './sitemap/sitemap.module';
+import { TelegramBotsModule } from './telegram-bots/telegram-bots.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { SitemapModule } from './sitemap/sitemap.module';
     FavoritesModule,
     OrdersModule,
     SitemapModule,
+    TelegramBotsModule,
   ],
 })
 export class AppModule {}

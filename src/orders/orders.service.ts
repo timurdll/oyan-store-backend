@@ -1,30 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaClient, OrderStatus } from '@prisma/client';
+import { OrderStatus } from '@prisma/client';
 import { NotificationsService } from 'src/notifications/notifications.service';
-import * as twilio from 'twilio';
 import { OrdersGateway } from './gateways/orders.gateways';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { TelegramBotsService } from 'src/telegram-bots/telegram-bots.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly ordersGateway: OrdersGateway,
+    private readonly telegramBotsService: TelegramBotsService,
   ) {}
-
-  private prisma = new PrismaClient();
-
-  private twilioClient = twilio(
-    process.env.TWILIO_SID, // SID из переменных окружения
-    process.env.TWILIO_AUTH_TOKEN, // Auth Token из переменных окружения
-  );
-
-  private companyWhatsAppNumber = process.env.COMPANY_WHATSAPP_NUMBER;
 
   // 3 процента
 
   async createOrder(userId: number, orderData: any) {
-    const { product, phoneNumber, totalAmount, legalEntityInfo } = orderData;
+    const { product, totalAmount, legalEntityInfo } = orderData;
 
     if (!Array.isArray(product) || product.length === 0) {
       throw new Error('Product list is empty or undefined');
@@ -46,12 +40,12 @@ export class OrdersService {
       }
     }
 
-    const order = await this.prisma.$transaction(async (prisma) => {
-      const createdOrder = await prisma.order.create({
+    const order = await this.prisma.$transaction(async (transactionalPrisma) => {
+      const createdOrder = await transactionalPrisma.order.create({
         data: {
           user: { connect: { id: userId } },
           totalPrice: totalAmount,
-          phoneNumber: phoneNumber,
+          phoneNumber: orderData.phoneNumber,
           products: {
             create: product.map((item) => ({
               productId: item.productId,
@@ -73,7 +67,7 @@ export class OrdersService {
       });
 
       for (const item of product) {
-        await prisma.product.update({
+        await transactionalPrisma.product.update({
           where: { id: item.productId },
           data: {
             stock: { decrement: item.quantity },
@@ -84,18 +78,18 @@ export class OrdersService {
       return createdOrder;
     });
 
-    const message = this.createWhatsAppMessage(
+    const message = this.createOrderNotificationMessage(
       orderData,
       order.products,
       totalAmount,
     );
 
-    await this.sendWhatsAppMessage(message);
+    await this.telegramBotsService.sendMessageToActiveBots(message);
 
     return order;
   }
 
-  private createWhatsAppMessage(
+  private createOrderNotificationMessage(
     orderData: {
       phoneNumber: string;
       fullName: string;
@@ -150,8 +144,12 @@ export class OrdersService {
     message += `Квартира: ${orderData.address.apartment || 'Не указана'}\n\n`;
 
     // Информация об оплате и заказе
+    const paymentMethods =
+      orderData.paymentData?.paymentMethod?.length > 0
+        ? orderData.paymentData.paymentMethod.join(', ')
+        : 'Не указано';
     message += `=== ИНФОРМАЦИЯ О ЗАКАЗЕ ===\n`;
-    message += `Способ оплаты: ${orderData.paymentData.paymentMethod.join(', ')}\n`;
+    message += `Способ оплаты: ${paymentMethods}\n`;
     message += `Общая стоимость: ${totalAmount}₸\n\n`;
 
     // Список продуктов
@@ -161,19 +159,6 @@ export class OrdersService {
     });
 
     return message;
-  }
-  // Отправка сообщения на WhatsApp
-  private async sendWhatsAppMessage(message: string) {
-    try {
-      await this.twilioClient.messages.create({
-        from: 'whatsapp:+14155238886', // Ваш Twilio номер WhatsApp
-        to: this.companyWhatsAppNumber, // Номер компании, на который отправляется сообщение
-        body: message,
-      });
-      console.log('Сообщение отправлено на WhatsApp');
-    } catch (error) {
-      console.error('Ошибка при отправке сообщения:', error);
-    }
   }
 
   // Получение всех заказов пользователя
@@ -205,7 +190,7 @@ export class OrdersService {
 
     const message = `Запрос на быструю покупку:\nПользователь: ${fullName}\nТелефон: ${phoneNumber}\nТовар: ${product.name}`;
 
-    await this.sendWhatsAppMessage(message);
+    await this.telegramBotsService.sendMessageToActiveBots(message);
 
     return { success: true, message: 'Запрос на быструю покупку отправлен' };
   }
