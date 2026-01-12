@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,39 +8,40 @@ datasource db {
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
-  email        String    @unique
-  password     String
-  role         String
-  firstName    String?
-  lastName     String?
-  dateOfBirth  DateTime?
-  profileImage String?
-  phoneNumber  String?
-  basket       Basket?
-  ratings      Rating[]
-  favorites    Favorite[]
-  orders       Order[]   // Обратная связь с заказами
-  bonuses   Float    @default(0.0) // Начисленные бонусы
-  holdingBonuses Float @default(0.0) // Бонусы на удержании
-  notifications Notification[]  // Add this field
-  preOrders    PreOrder[]
+  id             Int            @id @default(autoincrement())
+  email          String         @unique
+  password       String
+  role           String
+  dateOfBirth    DateTime?
+  firstName      String?
+  lastName       String?
+  profileImage   String?
+  phoneNumber    String?
+  bonuses        Float          @default(0.0)
+  holdingBonuses Float          @default(0.0)
+  basket         Basket?
+  favorites      Favorite[]
+  notifications  Notification[]
+  orders         Order[]
+  preOrders      PreOrder[]
+  ratings        Rating[]
 }
 
 model Basket {
-  id         Int            @id @default(autoincrement())
-  user_id    Int    @unique  // Добавлен атрибут @unique
-  user       User           @relation(fields: [user_id], references: [id])
-  products   BasketProduct[]
+  id       Int             @id @default(autoincrement())
+  user_id  Int             @unique
+  user     User            @relation(fields: [user_id], references: [id])
+  products BasketProduct[]
 }
 
 model BasketProduct {
-  basket_id Int
+  basket_id  Int
   product_id Int
   quantity   Int
-  basket     Basket @relation(fields: [basket_id], references: [id])
+  basket     Basket  @relation(fields: [basket_id], references: [id])
   product    Product @relation(fields: [product_id], references: [id])
-  @@id([basket_id, product_id]) // Уникальная комбинация корзины и продукта
+
+  @@id([basket_id, product_id])
 }
 
 model Product {
@@ -57,121 +52,117 @@ model Product {
   cover_image            String
   images                 String[]
   typeId                 Int
-  type                   Type                    @relation(fields: [typeId], references: [id])
-  basketProducts         BasketProduct[]
-  productInfo            ProductInfo?
-  ratings                Rating[]
-  favorites              Favorite[]
-  productCharacteristics ProductCharacteristic[]
-  orderProducts          OrderProduct[]
   stock                  Int                     @default(0)
-  preOrders              PreOrder[]
-  
-  // Новые поля для ссылок на маркетплейсы
   halyqLink              String?
   kaspiLink              String?
   satuLink               String?
+  driverLink             String?
+  basketProducts         BasketProduct[]
+  favorites              Favorite[]
+  orderProducts          OrderProduct[]
+  preOrders              PreOrder[]
+  type                   Type                    @relation(fields: [typeId], references: [id])
+  productCharacteristics ProductCharacteristic[]
+  productInfo            ProductInfo?
+  ProductTranslation     ProductTranslation[]
+  ratings                Rating[]
 }
 
-
 model ProductInfo {
-  id         Int      @id @default(autoincrement())
-  product_id Int    @unique  // Добавлен атрибут @unique
-  product    Product  @relation(fields: [product_id], references: [id])
-  title      String
-  description String
+  id                     Int                      @id @default(autoincrement())
+  product_id             Int                      @unique
+  title                  String
+  description            String
+  product                Product                  @relation(fields: [product_id], references: [id])
+  ProductInfoTranslation ProductInfoTranslation[]
 }
 
 model Rating {
-  id         Int      @id @default(autoincrement())
+  id         Int     @id @default(autoincrement())
   user_id    Int
   product_id Int
-  user       User     @relation(fields: [user_id], references: [id])
-  product    Product  @relation(fields: [product_id], references: [id])
   rate       Int
-  @@unique([user_id, product_id]) // Один пользователь может оставить один рейтинг на товар
+  product    Product @relation(fields: [product_id], references: [id])
+  user       User    @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, product_id])
 }
 
-
 model Type {
-  id              Int                     @id @default(autoincrement())
+  id              Int               @id @default(autoincrement())
   name            String
-  products        Product[] 
   characteristics Characteristic[]
+  products        Product[]
+  TypeTranslation TypeTranslation[]
 }
 
 model Characteristic {
-  id              Int                     @id @default(autoincrement())
-  name            String                  @unique
-  type            Type                    @relation(fields: [typeId], references: [id])
-  typeId          Int
-  productCharacteristics ProductCharacteristic[]
+  id                        Int                         @id @default(autoincrement())
+  typeId                    Int
+  name                      String                      @unique
+  type                      Type                        @relation(fields: [typeId], references: [id])
+  CharacteristicTranslation CharacteristicTranslation[]
+  productCharacteristics    ProductCharacteristic[]
 }
 
 model ProductCharacteristic {
-  id              Int                     @id @default(autoincrement())
-  description     String
-  product         Product                 @relation(fields: [productId], references: [id])
-  productId       Int
-  characteristic  Characteristic          @relation(fields: [characteristicId], references: [id])
-  characteristicId Int
+  id                               Int                                @id @default(autoincrement())
+  description                      String
+  productId                        Int
+  characteristicId                 Int
+  characteristic                   Characteristic                     @relation(fields: [characteristicId], references: [id])
+  product                          Product                            @relation(fields: [productId], references: [id])
+  ProductCharacteristicTranslation ProductCharacteristicTranslation[]
 }
+
 model Favorite {
-  id         Int      @id @default(autoincrement())
+  id         Int     @id @default(autoincrement())
   user_id    Int
   product_id Int
-  user       User     @relation(fields: [user_id], references: [id])
-  product    Product  @relation(fields: [product_id], references: [id])
+  product    Product @relation(fields: [product_id], references: [id])
+  user       User    @relation(fields: [user_id], references: [id])
 
-  @@unique([user_id, product_id]) // Один пользователь может добавить каждый товар в избранное только один раз
+  @@unique([user_id, product_id])
 }
 
 model Order {
-  id          Int          @id @default(autoincrement())
-  userId      Int
-  user        User         @relation(fields: [userId], references: [id])
-  status      OrderStatus  @default(PENDING)
-  totalPrice  Float
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  products    OrderProduct[]
-  phoneNumber String       // Номер телефона для связи
+  id              Int            @id @default(autoincrement())
+  userId          Int
+  status          OrderStatus    @default(PENDING)
+  totalPrice      Float
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  phoneNumber     String
   legalEntityInfo String?
+  user            User           @relation(fields: [userId], references: [id])
+  products        OrderProduct[]
 }
 
 model OrderProduct {
-  id         Int      @id @default(autoincrement())
-  orderId    Int
-  productId  Int
-  quantity   Int
-  order      Order    @relation(fields: [orderId], references: [id])
-  product    Product  @relation(fields: [productId], references: [id])
-}
-
-enum OrderStatus {
-  PENDING     // Ожидает обработки
-  CONFIRMED   // Подтвержден менеджером
-  PAID        // Оплачен
-  COMPLETED   // Завершен
-  CANCELED    // Отменен
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  quantity  Int
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
 }
 
 model Notification {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   userId    Int
-  user      User      @relation(fields: [userId], references: [id])
   message   String
-  read      Boolean   @default(false)
-  createdAt DateTime  @default(now())
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model PreOrder {
-  id         Int      @id @default(autoincrement())
-  userId     Int
-  productId  Int
-  user       User     @relation(fields: [userId], references: [id])
-  product    Product  @relation(fields: [productId], references: [id])
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model TelegramBot {
@@ -182,4 +173,68 @@ model TelegramBot {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model CharacteristicTranslation {
+  id               Int            @id @default(autoincrement())
+  characteristicId Int
+  language         Language
+  name             String
+  Characteristic   Characteristic @relation(fields: [characteristicId], references: [id], onDelete: Cascade)
+
+  @@unique([characteristicId, language])
+}
+
+model ProductCharacteristicTranslation {
+  id                      Int                   @id @default(autoincrement())
+  productCharacteristicId Int
+  language                Language
+  description             String
+  ProductCharacteristic   ProductCharacteristic @relation(fields: [productCharacteristicId], references: [id], onDelete: Cascade)
+
+  @@unique([productCharacteristicId, language])
+}
+
+model ProductInfoTranslation {
+  id            Int         @id @default(autoincrement())
+  productInfoId Int
+  language      Language
+  title         String
+  description   String
+  ProductInfo   ProductInfo @relation(fields: [productInfoId], references: [id], onDelete: Cascade)
+
+  @@unique([productInfoId, language])
+}
+
+model ProductTranslation {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  language  Language
+  name      String
+  Product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, language])
+}
+
+model TypeTranslation {
+  id       Int      @id @default(autoincrement())
+  typeId   Int
+  language Language
+  name     String
+  Type     Type     @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  @@unique([typeId, language])
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PAID
+  COMPLETED
+  CANCELED
+}
+
+enum Language {
+  RU
+  KK
 }

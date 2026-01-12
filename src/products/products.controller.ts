@@ -24,7 +24,7 @@ import { extname } from 'path';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(private readonly productsService: ProductsService) { }
 
   @UseGuards(AuthGuard, RolesGuard)
   @Post()
@@ -61,6 +61,7 @@ export class ProductsController {
       halyqLink?: string;
       kaspiLink?: string;
       satuLink?: string;
+      driverLink?: string;
     },
   ): Promise<Product> {
     const coverImagePath = files.cover_image
@@ -199,6 +200,7 @@ export class ProductsController {
       stock?: number;
       productInfo?: { title: string; description: string };
       characteristics?: { name: string; description: string }[];
+      driverLink?: string;
     },
   ): Promise<Product> {
     const coverImagePath = files.cover_image

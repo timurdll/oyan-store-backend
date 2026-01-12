@@ -11,7 +11,7 @@ export class ProductsService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly telegramBotsService: TelegramBotsService,
-  ) {}
+  ) { }
 
   async createProduct(data: {
     name: string;
@@ -29,6 +29,7 @@ export class ProductsService {
     halyqLink?: string;
     kaspiLink?: string;
     satuLink?: string;
+    driverLink?: string;
   }): Promise<Product> {
     const {
       productInfo,
@@ -36,6 +37,7 @@ export class ProductsService {
       halyqLink,
       kaspiLink,
       satuLink,
+      driverLink,
       ...productData
     } = data;
 
@@ -50,6 +52,7 @@ export class ProductsService {
           halyqLink, // Ссылка на маркетплейс "Халык"
           kaspiLink, // Ссылка на маркетплейс "Каспи"
           satuLink, // Ссылка на маркетплейс "Сату"
+          driverLink, // Ссылка на драйвера
           productInfo: productInfo ? { create: productInfo } : undefined,
         },
       });
@@ -188,6 +191,7 @@ export class ProductsService {
       halyqLink?: string;
       kaspiLink?: string;
       satuLink?: string;
+      driverLink?: string;
     },
   ): Promise<Product> {
     const {
@@ -198,6 +202,7 @@ export class ProductsService {
       halyqLink,
       kaspiLink,
       satuLink,
+      driverLink,
       ...productData
     } = data;
 
@@ -214,6 +219,7 @@ export class ProductsService {
           halyqLink, // Обновляем ссылку "Халык"
           kaspiLink, // Обновляем ссылку "Каспи"
           satuLink, // Обновляем ссылку "Сату"
+          driverLink, // Обновляем ссылку на драйвера
         },
       });
 
